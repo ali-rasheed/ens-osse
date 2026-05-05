@@ -9,9 +9,25 @@ interface Props {
   height: number
   variants: Variants
   delay?: number
+  fontSize?: number
+  paddingH?: number
+  paddingV?: number
+  color?: string
 }
 
-export function LabelNode({ label, x, y, width, height, variants, delay = 0 }: Props) {
+export function LabelNode({
+  label,
+  x,
+  y,
+  width,
+  height,
+  variants,
+  delay = 0,
+  fontSize = 14,
+  paddingH = 8,
+  paddingV = 4,
+  color = "#cfcfcf",
+}: Props) {
   return (
     <motion.div
       variants={variants}
@@ -25,11 +41,11 @@ export function LabelNode({ label, x, y, width, height, variants, delay = 0 }: P
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "4px 8px",
+        padding: `${paddingV}px ${paddingH}px`,
         fontFamily: "'ABC Marist', Georgia, serif",
         fontWeight: 400,
-        fontSize: 14,
-        color: "#cfcfcf",
+        fontSize,
+        color,
         whiteSpace: "nowrap",
       }}
     >

@@ -44,6 +44,13 @@ export default function App() {
     color:        { type: "color" as const, default: "#ffffff" },
   })
 
+  const labels = useDialKit("Labels", {
+    fontSize: [14, 8, 32],
+    paddingH: [8, 0, 32],
+    paddingV: [4, 0, 24],
+    color:    { type: "color" as const, default: "#cfcfcf" },
+  })
+
   const edges = useDialKit("Edges", {
     strokeWidth:  [1.5, 0.5, 4, 0.5],
     cornerRadius: [10, 0, 48],
@@ -79,6 +86,10 @@ export default function App() {
     borderRadius: nodes.borderRadius,
     borderWidth:  nodes.borderWidth,
     nodeColor:    nodes.color,
+    labelFontSize: labels.fontSize,
+    labelPaddingH: labels.paddingH,
+    labelPaddingV: labels.paddingV,
+    labelColor:    labels.color,
     strokeWidth:  edges.strokeWidth,
     cornerRadius: edges.cornerRadius,
     dotRadius:    edges.dotRadius,

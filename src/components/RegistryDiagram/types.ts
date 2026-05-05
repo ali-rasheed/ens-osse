@@ -25,6 +25,10 @@ export interface DiagramConfig {
   borderRadius?: number
   borderWidth?: number
   nodeColor?: string
+  labelFontSize?: number
+  labelPaddingH?: number
+  labelPaddingV?: number
+  labelColor?: string
   strokeWidth?: number
   cornerRadius?: number
   dotRadius?: number

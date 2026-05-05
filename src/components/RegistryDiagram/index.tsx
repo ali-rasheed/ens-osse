@@ -97,6 +97,10 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
     borderRadius = 6,
     borderWidth = 1.5,
     nodeColor = "#ffffff",
+    labelFontSize = 14,
+    labelPaddingH = 8,
+    labelPaddingV = 4,
+    labelColor = "#cfcfcf",
     strokeWidth = 1.5,
     cornerRadius = 10,
     dotRadius = 4,
@@ -117,8 +121,24 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
         paddingH,
         paddingV,
         borderWidth,
+        labelFontSize,
+        labelPaddingH,
+        labelPaddingV,
       }),
-    [nodes, edges, ranksep, nodesep, cornerRadius, fontSize, paddingH, paddingV, borderWidth]
+    [
+      nodes,
+      edges,
+      ranksep,
+      nodesep,
+      cornerRadius,
+      fontSize,
+      paddingH,
+      paddingV,
+      borderWidth,
+      labelFontSize,
+      labelPaddingH,
+      labelPaddingV,
+    ]
   )
 
   const sortedNodes = useMemo(
@@ -188,7 +208,15 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
         }
         if (node.type === "registry") return <RegistryNode {...props} {...styled} />
         if (node.type === "dashed") return <DashedNode {...props} {...styled} />
-        return <LabelNode {...props} />
+        return (
+          <LabelNode
+            {...props}
+            fontSize={labelFontSize}
+            paddingH={labelPaddingH}
+            paddingV={labelPaddingV}
+            color={labelColor}
+          />
+        )
       })}
     </motion.div>
   )
