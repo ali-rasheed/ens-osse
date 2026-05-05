@@ -1,4 +1,4 @@
-export type NodeType = "registry" | "label"
+export type NodeType = "registry" | "label" | "dashed"
 
 export interface NodeData {
   id: string

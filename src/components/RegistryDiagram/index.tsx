@@ -5,6 +5,7 @@ import type { NodeData, EdgeData, AnimationConfig } from "./types"
 import { computeLayout } from "./layout"
 import { RegistryNode } from "./RegistryNode"
 import { LabelNode } from "./LabelNode"
+import { DashedNode } from "./DashedNode"
 import { DiagramEdge, ArrowheadDef } from "./DiagramEdge"
 
 interface Props {
@@ -124,29 +125,20 @@ export function RegistryDiagram({ nodes, edges, animation = {} }: Props) {
       </motion.svg>
 
       {/* Nodes */}
-      {sortedNodes.map((node) =>
-        node.type === "registry" ? (
-          <RegistryNode
-            key={node.id}
-            label={node.label}
-            x={node.x}
-            y={node.y}
-            width={node.width}
-            height={node.height}
-            variants={nodeVariants}
-          />
-        ) : (
-          <LabelNode
-            key={node.id}
-            label={node.label}
-            x={node.x}
-            y={node.y}
-            width={node.width}
-            height={node.height}
-            variants={nodeVariants}
-          />
-        )
-      )}
+      {sortedNodes.map((node) => {
+        const props = {
+          key: node.id,
+          label: node.label,
+          x: node.x,
+          y: node.y,
+          width: node.width,
+          height: node.height,
+          variants: nodeVariants,
+        }
+        if (node.type === "registry") return <RegistryNode {...props} />
+        if (node.type === "dashed") return <DashedNode {...props} />
+        return <LabelNode {...props} />
+      })}
     </motion.div>
   )
 }

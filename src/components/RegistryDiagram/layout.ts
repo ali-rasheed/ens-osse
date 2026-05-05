@@ -1,14 +1,14 @@
 import dagre from "dagre"
-import type { NodeData, EdgeData, LayoutResult, PositionedNode, PositionedEdge } from "./types"
+import type { NodeData, NodeType, EdgeData, LayoutResult, PositionedNode, PositionedEdge } from "./types"
 
-// Approximate char widths at 40px (monospace vs proportional)
-const CHAR_WIDTH = { registry: 24, label: 22 }
-const PADDING_H = 64 // 32px each side
-const MIN_WIDTH = { registry: 131, label: 100 }
-const NODE_HEIGHT = { registry: 103, label: 97 }
+// Approximate char widths at the rendered font sizes
+const CHAR_WIDTH = { registry: 9.7, dashed: 9.7, label: 7 }
+const PADDING_H = { registry: 32, dashed: 32, label: 16 }
+const MIN_WIDTH = { registry: 56, dashed: 96, label: 32 }
+const NODE_HEIGHT = { registry: 30, dashed: 30, label: 22 }
 
-function nodeWidth(type: "registry" | "label", label: string): number {
-  return Math.max(MIN_WIDTH[type], label.length * CHAR_WIDTH[type] + PADDING_H)
+function nodeWidth(type: NodeType, label: string): number {
+  return Math.max(MIN_WIDTH[type], label.length * CHAR_WIDTH[type] + PADDING_H[type])
 }
 
 const PADDING = 40
