@@ -17,56 +17,75 @@ interface Props {
 
 function buildVariants(
   preset: AnimationConfig["preset"],
-  stagger: number,
   spring: Transition | undefined,
-  duration: number,
-  nodeCount: number
-): { container: Variants; node: Variants; edge: Variants } {
+  duration: number
+): { node: Variants; edge: Variants } {
   const none: Variants = { hidden: {}, visible: {} }
-  if (preset === "none") return { container: none, node: none, edge: none }
+  if (preset === "none") return { node: none, edge: none }
 
-  const edgeDelay = nodeCount * stagger
   const nodeTransition: Transition =
     spring ?? { type: "spring", visualDuration: 0.4, bounce: 0.1 }
 
-  const container: Variants = {
-    hidden: {},
-    visible: { transition: { staggerChildren: stagger, delayChildren: 0 } },
-  }
-
-  const edgeContainer: Variants = {
-    hidden: {},
-    visible: {
-      transition: { staggerChildren: stagger * 0.8, delayChildren: edgeDelay },
-    },
-  }
-
-  const nodeVariants: Record<string, Variants> = {
+  const nodeByPreset: Record<string, Variants> = {
     fade: {
       hidden: { opacity: 0 },
-      visible: { opacity: 1, transition: { duration } },
+      visible: (delay: number) => ({
+        opacity: 1,
+        transition: { duration, delay },
+      }),
     },
     pop: {
       hidden: { opacity: 0, scale: 0.7 },
-      visible: { opacity: 1, scale: 1, transition: nodeTransition },
+      visible: (delay: number) => ({
+        opacity: 1,
+        scale: 1,
+        transition: { ...nodeTransition, delay },
+      }),
     },
     draw: {
       hidden: { opacity: 0, scale: 0.85 },
-      visible: { opacity: 1, scale: 1, transition: nodeTransition },
+      visible: (delay: number) => ({
+        opacity: 1,
+        scale: 1,
+        transition: { ...nodeTransition, delay },
+      }),
     },
   }
 
-  const edgeVariants: Record<string, Variants> = {
-    fade: { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration } } },
-    pop: { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: duration * 0.5 } } },
-    draw: { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: duration * 0.3 } } },
+  const drawDuration = Math.max(duration * 0.6, 0.25)
+  const edgeByPreset: Record<string, Variants> = {
+    fade: {
+      hidden: { opacity: 0 },
+      visible: (delay: number) => ({
+        opacity: 1,
+        transition: { duration, delay },
+      }),
+    },
+    pop: {
+      hidden: { opacity: 0 },
+      visible: (delay: number) => ({
+        opacity: 1,
+        transition: { duration: duration * 0.5, delay },
+      }),
+    },
+    draw: {
+      hidden: { opacity: 0, pathLength: 0 },
+      visible: (delay: number) => ({
+        opacity: 1,
+        pathLength: 1,
+        transition: {
+          opacity: { duration: duration * 0.2, delay },
+          pathLength: { duration: drawDuration, delay },
+          default: { duration: drawDuration, delay },
+        },
+      }),
+    },
   }
 
   const key = preset ?? "fade"
   return {
-    container,
-    node: nodeVariants[key] ?? nodeVariants.fade,
-    edge: { ...edgeContainer, ...(edgeVariants[key] ?? edgeVariants.fade) },
+    node: nodeByPreset[key] ?? nodeByPreset.fade,
+    edge: edgeByPreset[key] ?? edgeByPreset.fade,
   }
 }
 
@@ -107,20 +126,29 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
     [layout.nodes]
   )
 
-  const { container, node: nodeVariants, edge: edgeVariants } = useMemo(
-    () => buildVariants(preset, stagger, spring, duration, sortedNodes.length),
-    [preset, stagger, spring, duration, sortedNodes.length]
+  // Interleave timing: each rank gets two beats — its nodes, then the edges
+  // leaving them. So the sequence reads node → arrow → node → arrow.
+  const rankById = useMemo(
+    () => new Map(layout.nodes.map((n) => [n.id, n.rank])),
+    [layout.nodes]
+  )
+
+  const nodeDelay = (rank: number) => rank * 2 * stagger
+  const edgeDelay = (fromId: string) =>
+    ((rankById.get(fromId) ?? 0) * 2 + 1) * stagger
+
+  const { node: nodeVariants, edge: edgeVariants } = useMemo(
+    () => buildVariants(preset, spring, duration),
+    [preset, spring, duration]
   )
 
   return (
     <motion.div
       initial="hidden"
       animate="visible"
-      variants={container}
       style={{ position: "relative", width: layout.width, height: layout.height }}
     >
-      <motion.svg
-        variants={edgeVariants}
+      <svg
         style={{ position: "absolute", inset: 0, overflow: "visible", pointerEvents: "none" }}
         width={layout.width}
         height={layout.height}
@@ -131,13 +159,13 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
             key={`${edge.from}-${edge.to}`}
             edge={edge}
             variants={edgeVariants}
-            preset={preset}
+            delay={edgeDelay(edge.from)}
             strokeWidth={strokeWidth}
             dotRadius={dotRadius}
             color={edgeColor}
           />
         ))}
-      </motion.svg>
+      </svg>
 
       {sortedNodes.map((node) => {
         const styled = {
@@ -156,6 +184,7 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
           width: node.width,
           height: node.height,
           variants: nodeVariants,
+          delay: nodeDelay(node.rank),
         }
         if (node.type === "registry") return <RegistryNode {...props} {...styled} />
         if (node.type === "dashed") return <DashedNode {...props} {...styled} />

@@ -5,7 +5,7 @@ import type { PositionedEdge } from "./types"
 interface Props {
   edge: PositionedEdge
   variants: Variants
-  preset: "draw" | "fade" | "pop" | "none"
+  delay?: number
   strokeWidth?: number
   dotRadius?: number
   color?: string
@@ -14,7 +14,7 @@ interface Props {
 export function DiagramEdge({
   edge,
   variants,
-  preset,
+  delay = 0,
   strokeWidth = 1.5,
   dotRadius = 4,
   color = "#ffffff",
@@ -27,6 +27,7 @@ export function DiagramEdge({
     <g>
       <motion.circle
         variants={variants}
+        custom={delay}
         cx={start.x}
         cy={start.y}
         r={dotRadius}
@@ -34,14 +35,12 @@ export function DiagramEdge({
       />
       <motion.path
         variants={variants}
+        custom={delay}
         d={edge.d}
         stroke={color}
         strokeWidth={strokeWidth}
         fill="none"
         markerEnd="url(#arrowhead)"
-        {...(preset === "draw"
-          ? { initial: { pathLength: 0 }, animate: { pathLength: 1 } }
-          : {})}
       />
     </g>
   )

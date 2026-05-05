@@ -8,6 +8,7 @@ interface Props {
   width: number
   height: number
   variants: Variants
+  delay?: number
   fontSize?: number
   paddingH?: number
   paddingV?: number
@@ -23,6 +24,7 @@ export function RegistryNode({
   width,
   height,
   variants,
+  delay = 0,
   fontSize = 16,
   paddingH = 16,
   paddingV = 10,
@@ -33,6 +35,7 @@ export function RegistryNode({
   return (
     <motion.div
       variants={variants}
+      custom={delay}
       style={{
         position: "absolute",
         left: x,

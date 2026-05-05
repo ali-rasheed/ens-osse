@@ -8,12 +8,14 @@ interface Props {
   width: number
   height: number
   variants: Variants
+  delay?: number
 }
 
-export function LabelNode({ label, x, y, width, height, variants }: Props) {
+export function LabelNode({ label, x, y, width, height, variants, delay = 0 }: Props) {
   return (
     <motion.div
       variants={variants}
+      custom={delay}
       style={{
         position: "absolute",
         left: x,
