@@ -11,30 +11,30 @@ import type {
 import { parseMermaid, serializeMermaid } from "./lib/mermaid"
 
 const DEFAULT_NODES: NodeData[] = [
-  { id: "root",       label: "<root>",                type: "registry" },
-  { id: "eth-l",      label: "eth",                   type: "label"    },
-  { id: "eth-r",      label: "eth",                   type: "registry" },
-  { id: "montoya-l1", label: "montoya",               type: "label"    },
-  { id: "montoya-l2", label: "montoya",               type: "label"    },
-  { id: "workemon",   label: "workemon.eth",          type: "registry" },
-  { id: "resolver1",  label: "Resolver 1",            type: "dashed"   },
-  { id: "delegate-l", label: "delegate",              type: "label"    },
-  { id: "wallet-l",   label: "wallet",                type: "label"    },
-  { id: "delegate-r", label: "delegate.workemon.eth", type: "registry" },
-  { id: "wallet-r",   label: "wallet.workemon.eth",   type: "registry" },
+  { id: "root",         label: "<root>",                type: "registry" },
+  { id: "eth-l",        label: "eth",                   type: "label"    },
+  { id: "eth-r",        label: "eth",                   type: "registry" },
+  { id: "workemon-l1",  label: "workemon",              type: "label"    },
+  { id: "workemon-l2",  label: "workemon",              type: "label"    },
+  { id: "workemon",     label: "workemon.eth",          type: "registry" },
+  { id: "resolver1",    label: "Resolver 1",            type: "dashed"   },
+  { id: "delegate-l",   label: "delegate",              type: "label"    },
+  { id: "wallet-l",     label: "wallet",                type: "label"    },
+  { id: "delegate-r",   label: "delegate.workemon.eth", type: "registry" },
+  { id: "wallet-r",     label: "wallet.workemon.eth",   type: "registry" },
 ]
 
 const DEFAULT_EDGES: EdgeData[] = [
-  { from: "root",       to: "eth-l"      },
-  { from: "eth-l",      to: "eth-r"      },
-  { from: "eth-r",      to: "montoya-l1" },
-  { from: "eth-r",      to: "montoya-l2" },
-  { from: "montoya-l1", to: "workemon"   },
-  { from: "montoya-l2", to: "resolver1"  },
-  { from: "workemon",   to: "delegate-l" },
-  { from: "workemon",   to: "wallet-l"   },
-  { from: "delegate-l", to: "delegate-r" },
-  { from: "wallet-l",   to: "wallet-r"   },
+  { from: "root",         to: "eth-l"        },
+  { from: "eth-l",        to: "eth-r"        },
+  { from: "eth-r",        to: "workemon-l1"  },
+  { from: "eth-r",        to: "workemon-l2"  },
+  { from: "workemon-l1",  to: "workemon"     },
+  { from: "workemon-l2",  to: "resolver1"    },
+  { from: "workemon",     to: "delegate-l"   },
+  { from: "workemon",     to: "wallet-l"     },
+  { from: "delegate-l",   to: "delegate-r"   },
+  { from: "wallet-l",     to: "wallet-r"     },
 ]
 
 const DEFAULT_MERMAID = serializeMermaid(DEFAULT_NODES, DEFAULT_EDGES)
@@ -53,7 +53,7 @@ export default function App() {
     fontSize: [14, 8, 32],
     paddingH: [8, 0, 32],
     paddingV: [4, 0, 24],
-    color:    { type: "color" as const, default: "#cfcfcf" },
+    color:    { type: "color" as const, default: "#ffffff" },
   })
 
   const edges = useDialKit("Edges", {

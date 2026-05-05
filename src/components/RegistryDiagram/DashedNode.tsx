@@ -17,9 +17,8 @@ interface Props {
   color?: string
 }
 
-const BORDER_OPACITY = 0.5
-const TEXT_OPACITY = 0.22
-const DASH_PATTERN = "8 6"
+const DASH_PATTERN = "6 5"
+const SOCKET = 5
 
 export function DashedNode({
   label,
@@ -63,10 +62,20 @@ export function DashedNode({
           ry={borderRadius}
           fill="none"
           stroke={color}
-          strokeOpacity={BORDER_OPACITY}
           strokeWidth={borderWidth}
           strokeDasharray={DASH_PATTERN}
           strokeLinecap="butt"
+        />
+        {/* Corner sockets */}
+        <rect x={0} y={0} width={SOCKET} height={SOCKET} fill={color} />
+        <rect x={width - SOCKET} y={0} width={SOCKET} height={SOCKET} fill={color} />
+        <rect x={0} y={height - SOCKET} width={SOCKET} height={SOCKET} fill={color} />
+        <rect
+          x={width - SOCKET}
+          y={height - SOCKET}
+          width={SOCKET}
+          height={SOCKET}
+          fill={color}
         />
       </svg>
       <div
@@ -77,11 +86,10 @@ export function DashedNode({
           alignItems: "center",
           justifyContent: "center",
           padding: `${paddingV}px ${paddingH}px`,
-          fontFamily: "'ABC Monument Grotesk', system-ui, sans-serif",
-          fontWeight: 400,
+          fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+          fontWeight: 500,
           fontSize,
           color,
-          opacity: TEXT_OPACITY,
           whiteSpace: "nowrap",
         }}
       >

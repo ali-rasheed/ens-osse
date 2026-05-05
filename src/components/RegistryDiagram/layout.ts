@@ -2,7 +2,11 @@ import dagre from "dagre"
 import type { NodeData, NodeType, EdgeData, LayoutResult, PositionedNode, PositionedEdge } from "./types"
 
 // Char-width ratios per font (px per character at 1px fontSize)
-const CHAR_RATIO = { registry: 0.6, dashed: 0.55, label: 0.5 }
+const CHAR_RATIO = { registry: 0.6, dashed: 0.6, label: 0.5 }
+// Extra horizontal/vertical chrome from the registry node's outer shell
+// (outer border + gap + inner border on each side). Keep in sync with
+// SHELL_GAP in RegistryNode.tsx.
+const REGISTRY_SHELL = 3 // gap between outer and inner outlines, per side
 
 interface BoxOptions {
   fontSize: number
@@ -25,9 +29,14 @@ function nodeBox(
     return { width: Math.max(32, w), height: h }
   }
   const minW = type === "dashed" ? 96 : 56
-  const w =
-    label.length * CHAR_RATIO[type] * opts.fontSize + opts.paddingH * 2 + opts.borderWidth * 2
-  const h = opts.fontSize * 1.4 + opts.paddingV * 2 + opts.borderWidth * 2
+  // Registry has a double outline: outer border + gap + inner border. Dashed
+  // is single-layered with corner sockets only.
+  const shell =
+    type === "registry"
+      ? 2 * (opts.borderWidth + REGISTRY_SHELL + opts.borderWidth)
+      : 2 * opts.borderWidth
+  const w = label.length * CHAR_RATIO[type] * opts.fontSize + opts.paddingH * 2 + shell
+  const h = opts.fontSize * 1.4 + opts.paddingV * 2 + shell
   return { width: Math.max(minW, w), height: h }
 }
 

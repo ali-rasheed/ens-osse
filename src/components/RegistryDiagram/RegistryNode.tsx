@@ -17,6 +17,8 @@ interface Props {
   color?: string
 }
 
+const SHELL_GAP = 3
+
 export function RegistryNode({
   label,
   x,
@@ -32,6 +34,7 @@ export function RegistryNode({
   borderWidth = 1.5,
   color = "#ffffff",
 }: Props) {
+  const outerRadius = borderRadius + SHELL_GAP
   return (
     <motion.div
       variants={variants}
@@ -44,19 +47,31 @@ export function RegistryNode({
         height,
         background: "transparent",
         border: `${borderWidth}px solid ${color}`,
-        borderRadius,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: `${paddingV}px ${paddingH}px`,
-        fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-        fontWeight: 500,
-        fontSize,
-        color,
-        whiteSpace: "nowrap",
+        borderRadius: outerRadius,
+        padding: SHELL_GAP,
+        boxSizing: "border-box",
       }}
     >
-      {label}
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          border: `${borderWidth}px solid ${color}`,
+          borderRadius,
+          boxSizing: "border-box",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: `${paddingV}px ${paddingH}px`,
+          fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+          fontWeight: 500,
+          fontSize,
+          color,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </div>
     </motion.div>
   )
 }
