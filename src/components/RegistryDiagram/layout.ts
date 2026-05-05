@@ -13,18 +13,55 @@ function nodeWidth(type: NodeType, label: string): number {
 
 const PADDING = 40
 
-function pointsToPath(points: { x: number; y: number }[]): string {
-  if (points.length === 0) return ""
-  const [first, ...rest] = points
-  return `M ${first.x} ${first.y} ` + rest.map((p) => `L ${p.x} ${p.y}`).join(" ")
+interface LayoutOptions {
+  ranksep?: number
+  nodesep?: number
+  cornerRadius?: number
 }
 
-export function computeLayout(nodes: NodeData[], edges: EdgeData[]): LayoutResult {
+function pointsToPath(points: { x: number; y: number }[], cornerRadius: number): string {
+  if (points.length === 0) return ""
+  if (points.length < 3 || cornerRadius <= 0) {
+    const [first, ...rest] = points
+    return `M ${first.x} ${first.y} ` + rest.map((p) => `L ${p.x} ${p.y}`).join(" ")
+  }
+
+  let d = `M ${points[0].x} ${points[0].y}`
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1]
+    const curr = points[i]
+    const next = points[i + 1]
+
+    const dxIn = curr.x - prev.x
+    const dyIn = curr.y - prev.y
+    const dxOut = next.x - curr.x
+    const dyOut = next.y - curr.y
+    const lenIn = Math.hypot(dxIn, dyIn) || 1
+    const lenOut = Math.hypot(dxOut, dyOut) || 1
+    const r = Math.min(cornerRadius, lenIn / 2, lenOut / 2)
+
+    const sx = curr.x - (dxIn / lenIn) * r
+    const sy = curr.y - (dyIn / lenIn) * r
+    const ex = curr.x + (dxOut / lenOut) * r
+    const ey = curr.y + (dyOut / lenOut) * r
+
+    d += ` L ${sx} ${sy} Q ${curr.x} ${curr.y} ${ex} ${ey}`
+  }
+  const last = points[points.length - 1]
+  return d + ` L ${last.x} ${last.y}`
+}
+
+export function computeLayout(
+  nodes: NodeData[],
+  edges: EdgeData[],
+  options: LayoutOptions = {}
+): LayoutResult {
+  const { ranksep = 70, nodesep = 50, cornerRadius = 10 } = options
   const g = new dagre.graphlib.Graph()
   g.setGraph({
     rankdir: "TB",
-    ranksep: 80,
-    nodesep: 60,
+    ranksep,
+    nodesep,
     edgesep: 10,
     marginx: PADDING,
     marginy: PADDING,
@@ -67,7 +104,7 @@ export function computeLayout(nodes: NodeData[], edges: EdgeData[]): LayoutResul
     return {
       ...edge,
       points,
-      d: pointsToPath(points),
+      d: pointsToPath(points, cornerRadius),
     }
   })
 
@@ -75,5 +112,5 @@ export function computeLayout(nodes: NodeData[], edges: EdgeData[]): LayoutResul
   const width = (graphData.width ?? 600) + PADDING
   const height = (graphData.height ?? 600) + PADDING
 
-  return { nodes: positionedNodes, edges: positionedEdges, width, height }
+  return { nodes: positionedNodes, edges: positionedEdges, width, height, cornerRadius }
 }

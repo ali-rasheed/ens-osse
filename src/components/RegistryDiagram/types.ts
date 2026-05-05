@@ -35,4 +35,5 @@ export interface LayoutResult {
   edges: PositionedEdge[]
   width: number
   height: number
+  cornerRadius: number
 }
