@@ -1,6 +1,11 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { DialRoot, useDialKit } from "dialkit"
+import "dialkit/styles.css"
 import { RegistryDiagram } from "./components/RegistryDiagram"
-import type { AnimationConfig } from "./components/RegistryDiagram/types"
+import type {
+  AnimationConfig,
+  DiagramConfig,
+} from "./components/RegistryDiagram/types"
 
 const NODES = [
   { id: "root",     label: "<root>",      type: "registry" as const },
@@ -21,15 +26,63 @@ const EDGES = [
   { from: "right-l", to: "root2"   },
 ]
 
-const PRESETS: AnimationConfig["preset"][] = ["draw", "fade", "pop", "none"]
-
 export default function App() {
-  const [preset, setPreset] = useState<AnimationConfig["preset"]>("draw")
-  const [key, setKey] = useState(0)
+  const nodes = useDialKit("Nodes", {
+    fontSize:     [16, 8, 40],
+    paddingH:     [16, 4, 48],
+    paddingV:     [10, 4, 32],
+    borderRadius: [6, 0, 24],
+    borderWidth:  [1.5, 0.5, 4, 0.5],
+    color:        { type: "color" as const, default: "#ffffff" },
+  })
 
-  function handlePreset(p: AnimationConfig["preset"]) {
-    setPreset(p)
+  const edges = useDialKit("Edges", {
+    strokeWidth:  [1.5, 0.5, 4, 0.5],
+    cornerRadius: [10, 0, 48],
+    dotRadius:    [4, 1, 10, 0.5],
+    color:        { type: "color" as const, default: "#ffffff" },
+  })
+
+  const layout = useDialKit("Layout", {
+    ranksep: [70, 20, 200],
+    nodesep: [50, 10, 150],
+  })
+
+  const animation = useDialKit("Animation", {
+    preset: {
+      type: "select" as const,
+      options: ["draw", "fade", "pop", "none"],
+      default: "draw",
+    },
+    stagger: [0.08, 0, 0.4, 0.01],
+    spring: { type: "spring" as const, visualDuration: 0.4, bounce: 0.1 },
+  })
+
+  // Re-mount the diagram when preset changes so entrance variants re-fire
+  const [key, setKey] = useState(0)
+  useEffect(() => {
     setKey((k) => k + 1)
+  }, [animation.preset])
+
+  const config: DiagramConfig = {
+    fontSize:     nodes.fontSize,
+    paddingH:     nodes.paddingH,
+    paddingV:     nodes.paddingV,
+    borderRadius: nodes.borderRadius,
+    borderWidth:  nodes.borderWidth,
+    nodeColor:    nodes.color,
+    strokeWidth:  edges.strokeWidth,
+    cornerRadius: edges.cornerRadius,
+    dotRadius:    edges.dotRadius,
+    edgeColor:    edges.color,
+    ranksep:      layout.ranksep,
+    nodesep:      layout.nodesep,
+  }
+
+  const animationConfig: AnimationConfig = {
+    preset: animation.preset as AnimationConfig["preset"],
+    stagger: animation.stagger,
+    spring: animation.spring,
   }
 
   return (
@@ -41,38 +94,17 @@ export default function App() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 40,
         padding: 40,
       }}
     >
-      {/* Preset toggle */}
-      <div style={{ display: "flex", gap: 8 }}>
-        {PRESETS.map((p) => (
-          <button
-            key={p}
-            onClick={() => handlePreset(p)}
-            style={{
-              padding: "8px 18px",
-              borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.15)",
-              background: preset === p ? "#595755" : "transparent",
-              color: preset === p ? "#faf9f7" : "#888",
-              fontFamily: "'Geist Mono', monospace",
-              fontSize: 13,
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
-          >
-            {p}
-          </button>
-        ))}
-      </div>
+      <DialRoot position="top-right" defaultOpen theme="dark" />
 
       <RegistryDiagram
         key={key}
         nodes={NODES}
         edges={EDGES}
-        animation={{ preset, stagger: 0.1, duration: 0.5 }}
+        animation={animationConfig}
+        config={config}
       />
     </div>
   )

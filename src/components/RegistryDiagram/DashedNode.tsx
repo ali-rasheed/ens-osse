@@ -8,9 +8,28 @@ interface Props {
   width: number
   height: number
   variants: Variants
+  fontSize?: number
+  paddingH?: number
+  paddingV?: number
+  borderRadius?: number
+  borderWidth?: number
+  color?: string
 }
 
-export function DashedNode({ label, x, y, width, height, variants }: Props) {
+export function DashedNode({
+  label,
+  x,
+  y,
+  width,
+  height,
+  variants,
+  fontSize = 16,
+  paddingH = 16,
+  paddingV = 10,
+  borderRadius = 6,
+  borderWidth = 1.5,
+  color = "#ffffff",
+}: Props) {
   return (
     <motion.div
       variants={variants}
@@ -21,16 +40,16 @@ export function DashedNode({ label, x, y, width, height, variants }: Props) {
         width,
         height,
         background: "transparent",
-        border: "1.5px dashed #ffffff",
-        borderRadius: 6,
+        border: `${borderWidth}px dashed ${color}`,
+        borderRadius,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "10px 16px",
+        padding: `${paddingV}px ${paddingH}px`,
         fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
         fontWeight: 500,
-        fontSize: 16,
-        color: "#ffffff",
+        fontSize,
+        color,
         whiteSpace: "nowrap",
       }}
     >

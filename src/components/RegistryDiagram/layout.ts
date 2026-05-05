@@ -1,14 +1,30 @@
 import dagre from "dagre"
 import type { NodeData, NodeType, EdgeData, LayoutResult, PositionedNode, PositionedEdge } from "./types"
 
-// Approximate char widths at the rendered font sizes
-const CHAR_WIDTH = { registry: 9.7, dashed: 9.7, label: 7 }
-const PADDING_H = { registry: 32, dashed: 32, label: 16 }
-const MIN_WIDTH = { registry: 56, dashed: 96, label: 32 }
-const NODE_HEIGHT = { registry: 30, dashed: 30, label: 22 }
+// Char-width ratios per font (px per character at 1px fontSize)
+const CHAR_RATIO = { registry: 0.6, dashed: 0.6, label: 0.5 }
+const LABEL_FONT_SIZE = 14
+const LABEL_PADDING_H = 8
+const LABEL_PADDING_V = 4
 
-function nodeWidth(type: NodeType, label: string): number {
-  return Math.max(MIN_WIDTH[type], label.length * CHAR_WIDTH[type] + PADDING_H[type])
+function nodeBox(
+  type: NodeType,
+  label: string,
+  fontSize: number,
+  paddingH: number,
+  paddingV: number,
+  borderWidth: number
+): { width: number; height: number } {
+  if (type === "label") {
+    const w = label.length * CHAR_RATIO.label * LABEL_FONT_SIZE + LABEL_PADDING_H * 2
+    const h = LABEL_FONT_SIZE * 1.4 + LABEL_PADDING_V * 2
+    return { width: Math.max(32, w), height: h }
+  }
+  const minW = type === "dashed" ? 96 : 56
+  const w =
+    label.length * CHAR_RATIO[type] * fontSize + paddingH * 2 + borderWidth * 2
+  const h = fontSize * 1.4 + paddingV * 2 + borderWidth * 2
+  return { width: Math.max(minW, w), height: h }
 }
 
 const PADDING = 40
@@ -17,6 +33,10 @@ interface LayoutOptions {
   ranksep?: number
   nodesep?: number
   cornerRadius?: number
+  fontSize?: number
+  paddingH?: number
+  paddingV?: number
+  borderWidth?: number
 }
 
 function pointsToPath(points: { x: number; y: number }[], cornerRadius: number): string {
@@ -56,7 +76,15 @@ export function computeLayout(
   edges: EdgeData[],
   options: LayoutOptions = {}
 ): LayoutResult {
-  const { ranksep = 70, nodesep = 50, cornerRadius = 10 } = options
+  const {
+    ranksep = 70,
+    nodesep = 50,
+    cornerRadius = 10,
+    fontSize = 16,
+    paddingH = 16,
+    paddingV = 10,
+    borderWidth = 1.5,
+  } = options
   const g = new dagre.graphlib.Graph()
   g.setGraph({
     rankdir: "TB",
@@ -69,11 +97,15 @@ export function computeLayout(
   g.setDefaultEdgeLabel(() => ({}))
 
   for (const node of nodes) {
-    g.setNode(node.id, {
-      label: node.label,
-      width: nodeWidth(node.type, node.label),
-      height: NODE_HEIGHT[node.type],
-    })
+    const { width, height } = nodeBox(
+      node.type,
+      node.label,
+      fontSize,
+      paddingH,
+      paddingV,
+      borderWidth
+    )
+    g.setNode(node.id, { label: node.label, width, height })
   }
 
   for (const edge of edges) {

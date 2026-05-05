@@ -6,29 +6,37 @@ interface Props {
   edge: PositionedEdge
   variants: Variants
   preset: "draw" | "fade" | "pop" | "none"
+  strokeWidth?: number
+  dotRadius?: number
+  color?: string
 }
 
-export function DiagramEdge({ edge, variants, preset }: Props) {
+export function DiagramEdge({
+  edge,
+  variants,
+  preset,
+  strokeWidth = 1.5,
+  dotRadius = 4,
+  color = "#ffffff",
+}: Props) {
   if (edge.points.length < 2) return null
 
   const start = edge.points[0]
 
   return (
     <g>
-      {/* Source dot */}
       <motion.circle
         variants={variants}
         cx={start.x}
         cy={start.y}
-        r={5}
-        fill="white"
+        r={dotRadius}
+        fill={color}
       />
-      {/* Connector line */}
       <motion.path
         variants={variants}
         d={edge.d}
-        stroke="white"
-        strokeWidth={1.5}
+        stroke={color}
+        strokeWidth={strokeWidth}
         fill="none"
         markerEnd="url(#arrowhead)"
         {...(preset === "draw"
@@ -39,7 +47,12 @@ export function DiagramEdge({ edge, variants, preset }: Props) {
   )
 }
 
-export function ArrowheadDef() {
+interface ArrowheadDefProps {
+  strokeWidth?: number
+  color?: string
+}
+
+export function ArrowheadDef({ strokeWidth = 1.5, color = "#ffffff" }: ArrowheadDefProps = {}) {
   return (
     <defs>
       <marker
@@ -50,7 +63,7 @@ export function ArrowheadDef() {
         refY={4}
         orient="auto"
       >
-        <path d="M 0 1.5 L 4 4 L 0 6.5" stroke="white" strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 0 1.5 L 4 4 L 0 6.5" stroke={color} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </marker>
     </defs>
   )

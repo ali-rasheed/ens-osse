@@ -15,6 +15,22 @@ export interface AnimationConfig {
   preset?: "draw" | "fade" | "pop" | "none"
   stagger?: number
   duration?: number
+  spring?: import("motion/react").Transition
+}
+
+export interface DiagramConfig {
+  fontSize?: number
+  paddingH?: number
+  paddingV?: number
+  borderRadius?: number
+  borderWidth?: number
+  nodeColor?: string
+  strokeWidth?: number
+  cornerRadius?: number
+  dotRadius?: number
+  edgeColor?: string
+  ranksep?: number
+  nodesep?: number
 }
 
 export interface PositionedNode extends NodeData {
