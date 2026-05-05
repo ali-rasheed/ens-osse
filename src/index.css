@@ -15,6 +15,22 @@
 }
 
 @font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "ABC Marist";
   src: url("/fonts/ABCMarist-Book.woff2") format("woff2");
   font-weight: 400;

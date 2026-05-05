@@ -17,6 +17,10 @@ interface Props {
   color?: string
 }
 
+const BORDER_OPACITY = 0.5
+const TEXT_OPACITY = 0.22
+const DASH_PATTERN = "8 6"
+
 export function DashedNode({
   label,
   x,
@@ -32,6 +36,7 @@ export function DashedNode({
   borderWidth = 1.5,
   color = "#ffffff",
 }: Props) {
+  const inset = borderWidth / 2
   return (
     <motion.div
       variants={variants}
@@ -42,21 +47,46 @@ export function DashedNode({
         top: y,
         width,
         height,
-        background: "transparent",
-        border: `${borderWidth}px dashed ${color}`,
-        borderRadius,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: `${paddingV}px ${paddingH}px`,
-        fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-        fontWeight: 500,
-        fontSize,
-        color,
-        whiteSpace: "nowrap",
       }}
     >
-      {label}
+      <svg
+        width={width}
+        height={height}
+        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      >
+        <rect
+          x={inset}
+          y={inset}
+          width={width - borderWidth}
+          height={height - borderWidth}
+          rx={borderRadius}
+          ry={borderRadius}
+          fill="none"
+          stroke={color}
+          strokeOpacity={BORDER_OPACITY}
+          strokeWidth={borderWidth}
+          strokeDasharray={DASH_PATTERN}
+          strokeLinecap="butt"
+        />
+      </svg>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: `${paddingV}px ${paddingH}px`,
+          fontFamily: "'ABC Monument Grotesk', system-ui, sans-serif",
+          fontWeight: 400,
+          fontSize,
+          color,
+          opacity: TEXT_OPACITY,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </div>
     </motion.div>
   )
 }

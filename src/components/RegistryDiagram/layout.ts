@@ -2,7 +2,7 @@ import dagre from "dagre"
 import type { NodeData, NodeType, EdgeData, LayoutResult, PositionedNode, PositionedEdge } from "./types"
 
 // Char-width ratios per font (px per character at 1px fontSize)
-const CHAR_RATIO = { registry: 0.6, dashed: 0.6, label: 0.5 }
+const CHAR_RATIO = { registry: 0.6, dashed: 0.55, label: 0.5 }
 
 interface BoxOptions {
   fontSize: number
