@@ -23,11 +23,11 @@ export function LabelNode({ label, x, y, width, height, variants }: Props) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px 32px",
-        fontFamily: "'Geist', sans-serif",
+        padding: "4px 8px",
+        fontFamily: "'ABC Marist', Georgia, serif",
         fontWeight: 400,
-        fontSize: 40,
-        color: "#e1e1e0",
+        fontSize: 14,
+        color: "#cfcfcf",
         whiteSpace: "nowrap",
       }}
     >
