@@ -68,23 +68,35 @@ export default function App() {
     nodesep: [50, 10, 150],
   })
 
-  const animation = useDialKit("Animation", {
-    preset: {
-      type: "select" as const,
-      options: ["draw", "fade", "pop", "none"],
-      default: "draw",
+  // Re-mount the diagram to re-fire entrance variants
+  const [key, setKey] = useState(0)
+  const replay = () => setKey((k) => k + 1)
+
+  const animation = useDialKit(
+    "Animation",
+    {
+      preset: {
+        type: "select" as const,
+        options: ["draw", "fade", "pop", "none"],
+        default: "draw",
+      },
+      stagger: [0.08, 0, 0.4, 0.01],
+      spring: { type: "spring" as const, visualDuration: 0.4, bounce: 0.1 },
+      replay: { type: "action" as const, label: "Replay" },
     },
-    stagger: [0.08, 0, 0.4, 0.01],
-    spring: { type: "spring" as const, visualDuration: 0.4, bounce: 0.1 },
-  })
+    {
+      onAction: (action) => {
+        if (action === "replay") replay()
+      },
+    }
+  )
 
   const [mermaid, setMermaid] = useState(DEFAULT_MERMAID)
   const parsed = useMemo(() => parseMermaid(mermaid), [mermaid])
 
-  // Re-mount the diagram when preset changes so entrance variants re-fire
-  const [key, setKey] = useState(0)
   useEffect(() => {
-    setKey((k) => k + 1)
+    replay()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animation.preset])
 
   const config: DiagramConfig = {
@@ -126,6 +138,8 @@ export default function App() {
     >
       <DialRoot position="top-right" defaultOpen theme="dark" />
 
+      <ReplayButton onClick={replay} />
+
       <MermaidInput value={mermaid} onChange={setMermaid} error={parsed.error} />
 
       <RegistryDiagram
@@ -136,6 +150,55 @@ export default function App() {
         config={config}
       />
     </div>
+  )
+}
+
+function ReplayButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        position: "fixed",
+        left: 16,
+        top: 16,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 14px",
+        background: "rgba(18, 18, 18, 0.92)",
+        color: "#e5e5e5",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 8,
+        backdropFilter: "blur(8px)",
+        boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+        fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+        fontSize: 12,
+        fontWeight: 500,
+        letterSpacing: 0.3,
+        cursor: "pointer",
+      }}
+    >
+      <svg width={12} height={12} viewBox="0 0 12 12" fill="none" aria-hidden>
+        <path
+          d="M2 6a4 4 0 1 1 1.2 2.85"
+          stroke="currentColor"
+          strokeWidth={1.4}
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M2 3.2v2.6h2.6"
+          stroke="currentColor"
+          strokeWidth={1.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
+      Replay
+    </button>
   )
 }
 
