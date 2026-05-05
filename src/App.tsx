@@ -8,22 +8,30 @@ import type {
 } from "./components/RegistryDiagram/types"
 
 const NODES = [
-  { id: "root",     label: "<root>",      type: "registry" as const },
-  { id: "eth-l",    label: "eth",          type: "label"    as const },
-  { id: "eth-r",    label: "eth",          type: "registry" as const },
-  { id: "left-l",   label: "eth",          type: "label"    as const },
-  { id: "right-l",  label: "eth",          type: "label"    as const },
-  { id: "workemon", label: "workemon.eth", type: "registry" as const },
-  { id: "root2",    label: "<root>",       type: "registry" as const },
+  { id: "root",       label: "<root>",                type: "registry" as const },
+  { id: "eth-l",      label: "eth",                   type: "label"    as const },
+  { id: "eth-r",      label: "eth",                   type: "registry" as const },
+  { id: "montoya-l1", label: "montoya",               type: "label"    as const },
+  { id: "montoya-l2", label: "montoya",               type: "label"    as const },
+  { id: "workemon",   label: "workemon.eth",          type: "registry" as const },
+  { id: "resolver1",  label: "Resolver 1",            type: "dashed"   as const },
+  { id: "delegate-l", label: "delegate",              type: "label"    as const },
+  { id: "wallet-l",   label: "wallet",                type: "label"    as const },
+  { id: "delegate-r", label: "delegate.workemon.eth", type: "registry" as const },
+  { id: "wallet-r",   label: "wallet.workemon.eth",   type: "registry" as const },
 ]
 
 const EDGES = [
-  { from: "root",    to: "eth-l"   },
-  { from: "eth-l",   to: "eth-r"   },
-  { from: "eth-r",   to: "left-l"  },
-  { from: "eth-r",   to: "right-l" },
-  { from: "left-l",  to: "workemon" },
-  { from: "right-l", to: "root2"   },
+  { from: "root",       to: "eth-l"      },
+  { from: "eth-l",      to: "eth-r"      },
+  { from: "eth-r",      to: "montoya-l1" },
+  { from: "eth-r",      to: "montoya-l2" },
+  { from: "montoya-l1", to: "workemon"   },
+  { from: "montoya-l2", to: "resolver1"  },
+  { from: "workemon",   to: "delegate-l" },
+  { from: "workemon",   to: "wallet-l"   },
+  { from: "delegate-l", to: "delegate-r" },
+  { from: "wallet-l",   to: "wallet-r"   },
 ]
 
 export default function App() {
