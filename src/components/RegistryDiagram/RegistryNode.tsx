@@ -30,7 +30,10 @@ export interface NestedDashedNodeProps {
   paddingV: number
   borderRadius: number
   borderWidth: number
+  /** Dashed stroke + socket outline color (Diagram System). */
   color: string
+  /** Center label; defaults to `color` when omitted. */
+  textColor?: string
   surfaceFill?: string
   socketColor?: string
   frameInset: number
@@ -509,6 +512,7 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
         borderRadius={d.borderRadius}
         borderWidth={d.borderWidth}
         color={d.color}
+        textColor={d.textColor}
         socketColor={d.socketColor}
         frameInset={d.frameInset}
         radiusBonus={d.radiusBonus}
