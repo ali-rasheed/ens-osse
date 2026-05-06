@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { forwardRef, useMemo } from "react"
 import { motion } from "motion/react"
 import type { Variants, Transition } from "motion/react"
 import type { NodeData, EdgeData, AnimationConfig, DiagramConfig } from "./types"
@@ -89,7 +89,10 @@ function buildVariants(
   }
 }
 
-export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: Props) {
+export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function RegistryDiagram(
+  { nodes, edges, animation = {}, config = {} },
+  ref
+) {
   const {
     fontSize = 16,
     paddingH = 16,
@@ -97,6 +100,11 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
     borderRadius = 6,
     borderWidth = 1.5,
     nodeColor = "#ffffff",
+    labelSurfaceFill,
+    labelSurfaceBorder,
+    hatchBase,
+    hatchStripe1,
+    hatchStripe2,
     labelFontSize = 14,
     labelPaddingH = 8,
     labelPaddingV = 4,
@@ -198,16 +206,34 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
     [preset, spring, duration]
   )
 
+  const surface = {
+    surfaceFill: labelSurfaceFill,
+    surfaceBorder: labelSurfaceBorder,
+    hatchBase,
+    hatchStripe1,
+    hatchStripe2,
+  }
+
+  /** Integer box avoids subpixel foreignObject/border drift in PNG export; dagre coords stay as-is inside. */
+  const canvasW = Math.ceil(layout.width)
+  const canvasH = Math.ceil(layout.height)
+
   return (
     <motion.div
+      ref={ref}
       initial="hidden"
       animate="visible"
-      style={{ position: "relative", width: layout.width, height: layout.height }}
+      style={{
+        position: "relative",
+        width: canvasW,
+        height: canvasH,
+        transformOrigin: "0 0",
+      }}
     >
       <svg
         style={{ position: "absolute", inset: 0, overflow: "visible", pointerEvents: "none" }}
-        width={layout.width}
-        height={layout.height}
+        width={canvasW}
+        height={canvasH}
       >
         <ArrowheadDef strokeWidth={strokeWidth} color={edgeColor} />
         {layout.edges.map((edge) => (
@@ -266,6 +292,9 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
               slotPaddingH={labelPaddingH}
               slotPaddingV={labelPaddingV}
               slotColor={labelColor}
+              hatchBase={hatchBase}
+              hatchStripe1={hatchStripe1}
+              hatchStripe2={hatchStripe2}
             />
           )
         if (node.type === "dashed") return <DashedNode {...props} {...resolverStyled} />
@@ -277,9 +306,16 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
             paddingH={labelPaddingH}
             paddingV={labelPaddingV}
             color={labelColor}
+            surfaceFill={surface.surfaceFill}
+            surfaceBorder={surface.surfaceBorder}
+            hatchBase={surface.hatchBase}
+            hatchStripe1={surface.hatchStripe1}
+            hatchStripe2={surface.hatchStripe2}
           />
         )
       })}
     </motion.div>
   )
-}
+})
+
+RegistryDiagram.displayName = "RegistryDiagram"

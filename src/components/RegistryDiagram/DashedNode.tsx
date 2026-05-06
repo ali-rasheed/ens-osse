@@ -56,6 +56,7 @@ export function DashedNode({
         top: y,
         width,
         height,
+        transformOrigin: "0 0",
       }}
     >
       <svg

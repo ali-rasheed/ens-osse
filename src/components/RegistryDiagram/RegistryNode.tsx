@@ -32,6 +32,9 @@ interface Props {
   slotPaddingH?: number
   slotPaddingV?: number
   slotColor?: string
+  hatchBase?: string
+  hatchStripe1?: string
+  hatchStripe2?: string
 }
 
 export function RegistryNode({
@@ -53,6 +56,9 @@ export function RegistryNode({
   slotPaddingH = 8,
   slotPaddingV = 4,
   slotColor = "#cfcfcf",
+  hatchBase = "rgba(255, 255, 255, 0.04)",
+  hatchStripe1 = "rgba(255,255,255,0.14)",
+  hatchStripe2 = "rgba(255,255,255,0.12)",
 }: Props) {
   const outerRadius = borderRadius + REGISTRY_SHELL_GAP
   const activeSlots = slots?.filter(Boolean) ?? []
@@ -73,6 +79,7 @@ export function RegistryNode({
           borderRadius: outerRadius,
           padding: REGISTRY_SHELL_GAP,
           boxSizing: "border-box",
+          transformOrigin: "0 0",
         }}
       >
         <div
@@ -115,6 +122,7 @@ export function RegistryNode({
         borderRadius: outerRadius,
         padding: REGISTRY_SHELL_GAP,
         boxSizing: "border-box",
+        transformOrigin: "0 0",
       }}
     >
       <div
@@ -176,10 +184,10 @@ export function RegistryNode({
                   position: "absolute",
                   inset: 0,
                   borderRadius: LABEL_RADIUS,
-                  backgroundColor: "rgba(255, 255, 255, 0.04)",
+                  backgroundColor: hatchBase,
                   backgroundImage: [
-                    "repeating-linear-gradient(45deg, transparent 0 8px, rgba(255,255,255,0.14) 8px 9px, transparent 9px 16px)",
-                    "repeating-linear-gradient(-45deg, transparent 0 8px, rgba(255,255,255,0.12) 8px 9px, transparent 9px 16px)",
+                    `repeating-linear-gradient(45deg, transparent 0 8px, ${hatchStripe1} 8px 9px, transparent 9px 16px)`,
+                    `repeating-linear-gradient(-45deg, transparent 0 8px, ${hatchStripe2} 8px 9px, transparent 9px 16px)`,
                   ].join(", "),
                 }}
               />

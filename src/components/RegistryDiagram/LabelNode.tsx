@@ -22,6 +22,12 @@ interface Props {
   paddingV?: number
   color?: string
   hatched: boolean
+  /** Mode-driven pill fill (plain labels). */
+  surfaceFill?: string
+  surfaceBorder?: string
+  hatchBase?: string
+  hatchStripe1?: string
+  hatchStripe2?: string
 }
 
 export function LabelNode({
@@ -37,6 +43,11 @@ export function LabelNode({
   paddingV = 12,
   color = "#ffffff",
   hatched,
+  surfaceFill = "rgba(255, 255, 255, 0.06)",
+  surfaceBorder = "1px solid rgba(255, 255, 255, 0.08)",
+  hatchBase = "rgba(255, 255, 255, 0.04)",
+  hatchStripe1 = "rgba(255,255,255,0.14)",
+  hatchStripe2 = "rgba(255,255,255,0.12)",
 }: Props) {
   return (
     <motion.div
@@ -57,8 +68,9 @@ export function LabelNode({
         borderRadius: LABEL_RADIUS,
         color,
         whiteSpace: "nowrap",
-        background: hatched ? "transparent" : "rgba(255, 255, 255, 0.06)",
-        border: hatched ? undefined : "1px solid rgba(255, 255, 255, 0.08)",
+        background: hatched ? "transparent" : surfaceFill,
+        border: hatched ? undefined : surfaceBorder,
+        transformOrigin: "0 0",
       }}
     >
       {hatched ? (
@@ -68,10 +80,10 @@ export function LabelNode({
             position: "absolute",
             inset: 0,
             borderRadius: LABEL_RADIUS,
-            backgroundColor: "rgba(255, 255, 255, 0.04)",
+            backgroundColor: hatchBase,
             backgroundImage: [
-              "repeating-linear-gradient(45deg, transparent 0 8px, rgba(255,255,255,0.14) 8px 9px, transparent 9px 16px)",
-              "repeating-linear-gradient(-45deg, transparent 0 8px, rgba(255,255,255,0.12) 8px 9px, transparent 9px 16px)",
+              `repeating-linear-gradient(45deg, transparent 0 8px, ${hatchStripe1} 8px 9px, transparent 9px 16px)`,
+              `repeating-linear-gradient(-45deg, transparent 0 8px, ${hatchStripe2} 8px 9px, transparent 9px 16px)`,
             ].join(", "),
           }}
         />
