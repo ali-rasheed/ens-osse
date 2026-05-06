@@ -512,7 +512,7 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
         borderRadius={d.borderRadius}
         borderWidth={d.borderWidth}
         color={d.color}
-        textColor={d.textColor}
+        labelColor={d.textColor ?? d.color}
         socketColor={d.socketColor}
         frameInset={d.frameInset}
         radiusBonus={d.radiusBonus}

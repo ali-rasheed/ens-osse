@@ -6,7 +6,7 @@ import {
   getArrowheadDelayOffset,
   resolveAnimationConfig,
 } from "./animationConfig"
-import { computeLayout } from "./layout"
+import { computeLayout, DIAGRAM_SYSTEM_EMBEDDED_RESOLVER } from "./layout"
 import { RegistryNode } from "./RegistryNode"
 import { LabelNode } from "./LabelNode"
 import { DashedNode } from "./DashedNode"
@@ -104,38 +104,40 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     ]
   )
 
+  const dsEmb = DIAGRAM_SYSTEM_EMBEDDED_RESOLVER
   const nestedDashedProps = useMemo(
     () => ({
-      fontSize: resolverFontSize,
-      paddingH: resolverPaddingH,
-      paddingV: resolverPaddingV,
-      borderRadius: resolverBorderRadius,
-      borderWidth: resolverBorderWidth,
+      /** Mono size aligned with sibling owner lines in nested registry (`labelFontSize`). */
+      fontSize: labelFontSize,
+      paddingH: dsEmb.paddingH,
+      paddingV: dsEmb.paddingV,
+      borderRadius: dsEmb.borderRadius,
+      borderWidth: dsEmb.borderWidth,
       color: resolverColor,
-      labelColor: resolverLabelColor ?? resolverColor,
+      textColor: resolverLabelColor ?? resolverColor,
       surfaceFill: resolverSurfaceFill,
       socketColor: resolverSocketColor,
-      frameInset: resolverFrameInset,
-      radiusBonus: resolverRadiusBonus,
-      socketSize: resolverSocketSize,
-      dashLength: resolverDashLength,
-      dashGap: resolverDashGap,
+      frameInset: dsEmb.frameInset,
+      radiusBonus: dsEmb.radiusBonus,
+      socketSize: dsEmb.socketSize,
+      dashLength: dsEmb.dashLength,
+      dashGap: dsEmb.dashGap,
     }),
     [
-      resolverFontSize,
-      resolverPaddingH,
-      resolverPaddingV,
-      resolverBorderRadius,
-      resolverBorderWidth,
+      labelFontSize,
+      dsEmb.paddingH,
+      dsEmb.paddingV,
+      dsEmb.borderRadius,
+      dsEmb.borderWidth,
+      dsEmb.frameInset,
+      dsEmb.radiusBonus,
+      dsEmb.socketSize,
+      dsEmb.dashLength,
+      dsEmb.dashGap,
       resolverColor,
       resolverLabelColor,
       resolverSurfaceFill,
       resolverSocketColor,
-      resolverFrameInset,
-      resolverRadiusBonus,
-      resolverSocketSize,
-      resolverDashLength,
-      resolverDashGap,
     ]
   )
 
