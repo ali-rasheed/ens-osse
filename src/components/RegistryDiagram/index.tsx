@@ -101,6 +101,20 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
     labelPaddingH = 8,
     labelPaddingV = 4,
     labelColor = "#cfcfcf",
+    resolverFontSize = 16,
+    resolverPaddingH = 16,
+    resolverPaddingV = 10,
+    resolverBorderRadius = 6,
+    resolverBorderWidth = 0.5,
+    resolverColor = "#ffffff",
+    resolverFrameInset = 10,
+    resolverRadiusBonus = 8,
+    resolverSocketSize = 12,
+    resolverSocketOverhang = 6,
+    resolverMinWidth = 291,
+    resolverMinHeight = 115,
+    resolverDashLength = 6,
+    resolverDashGap = 5,
     strokeWidth = 1.5,
     cornerRadius = 10,
     dotRadius = 4,
@@ -121,6 +135,13 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
         paddingH,
         paddingV,
         borderWidth,
+        resolverFontSize,
+        resolverPaddingH,
+        resolverPaddingV,
+        resolverBorderWidth,
+        resolverSocketOverhang,
+        resolverMinWidth,
+        resolverMinHeight,
         labelFontSize,
         labelPaddingH,
         labelPaddingV,
@@ -135,6 +156,13 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
       paddingH,
       paddingV,
       borderWidth,
+      resolverFontSize,
+      resolverPaddingH,
+      resolverPaddingV,
+      resolverBorderWidth,
+      resolverSocketOverhang,
+      resolverMinWidth,
+      resolverMinHeight,
       labelFontSize,
       labelPaddingH,
       labelPaddingV,
@@ -156,6 +184,14 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
   const nodeDelay = (rank: number) => rank * 2 * stagger
   const edgeDelay = (fromId: string) =>
     ((rankById.get(fromId) ?? 0) * 2 + 1) * stagger
+  const arrowDelayOffset =
+    preset === "draw"
+      ? Math.max(duration * 0.6, 0.25)
+      : preset === "pop"
+        ? duration * 0.5
+        : preset === "none"
+          ? 0
+          : duration
 
   const { node: nodeVariants, edge: edgeVariants } = useMemo(
     () => buildVariants(preset, spring, duration),
@@ -183,6 +219,7 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
             strokeWidth={strokeWidth}
             dotRadius={dotRadius}
             color={edgeColor}
+            arrowDelayOffset={arrowDelayOffset}
           />
         ))}
       </svg>
@@ -196,6 +233,19 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
           borderWidth,
           color: nodeColor,
         }
+        const resolverStyled = {
+          fontSize: resolverFontSize,
+          paddingH: resolverPaddingH,
+          paddingV: resolverPaddingV,
+          borderRadius: resolverBorderRadius,
+          borderWidth: resolverBorderWidth,
+          color: resolverColor,
+          frameInset: resolverFrameInset,
+          radiusBonus: resolverRadiusBonus,
+          socketSize: resolverSocketSize,
+          dashLength: resolverDashLength,
+          dashGap: resolverDashGap,
+        }
         const props = {
           key: node.id,
           label: node.label,
@@ -206,11 +256,23 @@ export function RegistryDiagram({ nodes, edges, animation = {}, config = {} }: P
           variants: nodeVariants,
           delay: nodeDelay(node.rank),
         }
-        if (node.type === "registry") return <RegistryNode {...props} {...styled} />
-        if (node.type === "dashed") return <DashedNode {...props} {...styled} />
+        if (node.type === "registry")
+          return (
+            <RegistryNode
+              {...props}
+              {...styled}
+              slots={node.slots}
+              slotFontSize={labelFontSize}
+              slotPaddingH={labelPaddingH}
+              slotPaddingV={labelPaddingV}
+              slotColor={labelColor}
+            />
+          )
+        if (node.type === "dashed") return <DashedNode {...props} {...resolverStyled} />
         return (
           <LabelNode
             {...props}
+            hatched={node.type === "labelHatched"}
             fontSize={labelFontSize}
             paddingH={labelPaddingH}
             paddingV={labelPaddingV}
