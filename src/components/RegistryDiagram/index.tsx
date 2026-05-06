@@ -1,6 +1,14 @@
 import { forwardRef, useMemo } from "react"
-import { motion } from "motion/react"
-import type { NodeData, EdgeData, AnimationConfig, DiagramConfig } from "./types"
+import { motion, useReducedMotion } from "motion/react"
+import type {
+  NodeData,
+  EdgeData,
+  AnimationConfig,
+  DiagramConfig,
+  PathPulseConfig,
+} from "./types"
+import { DEFAULT_PATH_PULSE_HIGHLIGHT } from "./theme"
+import { findDirectedPath } from "./findDirectedPath"
 import {
   buildVariants,
   getArrowheadDelayOffset,
@@ -17,10 +25,12 @@ interface Props {
   edges: EdgeData[]
   animation?: AnimationConfig
   config?: DiagramConfig
+  /** Directed shortest-path pulse; disabled when `prefers-reduced-motion` is set. */
+  pathPulse?: PathPulseConfig | null
 }
 
 export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function RegistryDiagram(
-  { nodes, edges, animation = {}, config = {} },
+  { nodes, edges, animation = {}, config = {}, pathPulse = null },
   ref
 ) {
   const {
@@ -69,6 +79,9 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
   } = config
 
   const { preset, stagger, spring, duration } = resolveAnimationConfig(animation)
+  const prefersReducedMotion = useReducedMotion() === true
+  /** Empty variants + instant arrow; also used when `prefers-reduced-motion` is set. */
+  const displayPreset = prefersReducedMotion ? "none" : preset
 
   const layoutMetrics = useMemo(
     () => ({
@@ -140,6 +153,39 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     ]
   )
 
+  const pathResult = useMemo(() => {
+    if (!pathPulse) return null
+    const from = pathPulse.from.trim()
+    const to = pathPulse.to.trim()
+    if (!from || !to) return null
+    return findDirectedPath(edges, from, to)
+  }, [pathPulse, edges])
+
+  const pathLen = pathResult?.nodeIds.length ?? 0
+  const pulseActive = Boolean(
+    pathPulse && pathResult && pathLen > 0 && !prefersReducedMotion
+  )
+  const pulseHighlight =
+    pathPulse?.highlightColor?.trim() || DEFAULT_PATH_PULSE_HIGHLIGHT
+  const pulseHold = pathPulse?.hold ?? 0
+  const pulseIncludeEdges = pathPulse?.includeEdges !== false
+
+  const nodePathIndex = useMemo(() => {
+    const m = new Map<string, number>()
+    if (!pathResult) return m
+    pathResult.nodeIds.forEach((id, i) => m.set(id, i))
+    return m
+  }, [pathResult])
+
+  const edgePulseTailIndex = useMemo(() => {
+    const m = new Map<number, number>()
+    if (!pathResult) return m
+    pathResult.edgeIndices.forEach((ei, segIdx) => {
+      m.set(ei, segIdx + 1)
+    })
+    return m
+  }, [pathResult])
+
   const layout = useMemo(
     () =>
       computeLayout(nodes, edges, {
@@ -199,12 +245,13 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
   const nodeDelay = (rank: number) => rank * 2 * stagger
   const edgeDelay = (fromId: string) =>
     ((rankById.get(fromId) ?? 0) * 2 + 1) * stagger
-  const arrowDelayOffset = getArrowheadDelayOffset(preset, duration)
+  const arrowDelayOffset = getArrowheadDelayOffset(displayPreset, duration)
 
   const { node: nodeVariants, edge: edgeVariants } = useMemo(
-    () => buildVariants(preset, spring, duration),
-    [preset, spring, duration]
+    () => buildVariants(displayPreset, spring, duration),
+    [displayPreset, spring, duration]
   )
+  const instantArrowhead = displayPreset === "none"
 
   const surface = {
     surfaceFill: labelSurfaceFill,
@@ -217,6 +264,36 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
   /** Integer box avoids subpixel foreignObject/border drift in PNG export; dagre coords stay as-is inside. */
   const canvasW = Math.ceil(layout.width)
   const canvasH = Math.ceil(layout.height)
+
+  function nodePathPulseProps(nodeId: string) {
+    if (!pulseActive || !pathPulse) return undefined
+    const pathIndex = nodePathIndex.get(nodeId) ?? -1
+    if (pathIndex < 0) return undefined
+    return {
+      active: true as const,
+      pathIndex,
+      pathLength: pathLen,
+      stagger: pathPulse.stagger,
+      segmentDuration: pathPulse.segmentDuration,
+      hold: pulseHold,
+      highlightColor: pulseHighlight,
+    }
+  }
+
+  function edgePathPulseProps(edgeIdx: number) {
+    if (!pulseActive || !pathPulse || !pulseIncludeEdges) return undefined
+    const pathIndex = edgePulseTailIndex.get(edgeIdx) ?? -1
+    if (pathIndex < 0) return undefined
+    return {
+      active: true as const,
+      pathIndex,
+      pathLength: pathLen,
+      stagger: pathPulse.stagger,
+      segmentDuration: pathPulse.segmentDuration,
+      hold: pulseHold,
+      highlightColor: pulseHighlight,
+    }
+  }
 
   return (
     <motion.div
@@ -236,9 +313,9 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
         height={canvasH}
       >
         <ArrowheadDef strokeWidth={strokeWidth} color={edgeColor} />
-        {layout.edges.map((edge) => (
+        {layout.edges.map((edge, edgeIdx) => (
           <DiagramEdge
-            key={`${edge.from}-${edge.to}`}
+            key={`${edge.from}-${edge.to}-${edgeIdx}`}
             edge={edge}
             variants={edgeVariants}
             delay={edgeDelay(edge.from)}
@@ -246,6 +323,8 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
             dotRadius={dotRadius}
             color={edgeColor}
             arrowDelayOffset={arrowDelayOffset}
+            instantArrowhead={instantArrowhead}
+            pathPulse={edgePathPulseProps(edgeIdx)}
           />
         ))}
       </svg>
@@ -309,10 +388,18 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
               labelLetterSpacing={labelLetterSpacing}
               primaryLetterSpacing={primaryLetterSpacing}
               slotsFont={node.slotsFont ?? "marist"}
+              pathPulse={nodePathPulseProps(node.id)}
             />
           )
         if (node.type === "dashed")
-          return <DashedNode {...props} {...resolverStyled} stackDepth={node.stackDepth} />
+          return (
+            <DashedNode
+              {...props}
+              {...resolverStyled}
+              stackDepth={node.stackDepth}
+              pathPulse={nodePathPulseProps(node.id)}
+            />
+          )
         return (
           <LabelNode
             {...props}
@@ -329,6 +416,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
             hatchStripe2={surface.hatchStripe2}
             borderRadius={labelBorderRadius}
             letterSpacingEm={labelLetterSpacing}
+            pathPulse={nodePathPulseProps(node.id)}
           />
         )
       })}

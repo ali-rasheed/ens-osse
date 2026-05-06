@@ -6,6 +6,7 @@ import { motion } from "motion/react"
 import type { Variants } from "motion/react"
 import type { DiagramTypography } from "./theme"
 import { DIAGRAM_FONTS } from "./theme"
+import { PathPulseRing } from "./PathPulseRing"
 
 interface Props {
   label: string
@@ -32,6 +33,16 @@ interface Props {
   embedded?: boolean
   borderRadius?: number
   letterSpacingEm?: number
+  /** Looped highlight along a graph path; ring is a separate Motion layer. */
+  pathPulse?: {
+    active: boolean
+    pathIndex: number
+    pathLength: number
+    stagger: number
+    segmentDuration: number
+    hold: number
+    highlightColor: string
+  }
 }
 
 export function LabelNode({
@@ -56,7 +67,14 @@ export function LabelNode({
   embedded = false,
   borderRadius = 12,
   letterSpacingEm = 0.05,
+  pathPulse,
 }: Props) {
+  const pulseRing =
+    pathPulse &&
+    pathPulse.active &&
+    pathPulse.pathIndex >= 0 &&
+    pathPulse.pathLength >= 1
+
   return (
     <motion.div
       variants={variants}
@@ -72,7 +90,7 @@ export function LabelNode({
         justifyContent: "center",
         padding: `${paddingV}px ${paddingH}px`,
         boxSizing: "border-box",
-        overflow: "hidden",
+        overflow: pulseRing ? "visible" : "hidden",
         borderRadius,
         color,
         whiteSpace: "nowrap",
@@ -81,6 +99,18 @@ export function LabelNode({
         transformOrigin: "0 0",
       }}
     >
+      {pathPulse ? (
+        <PathPulseRing
+          active={pathPulse.active}
+          pathIndex={pathPulse.pathIndex}
+          pathLength={pathPulse.pathLength}
+          stagger={pathPulse.stagger}
+          segmentDuration={pathPulse.segmentDuration}
+          hold={pathPulse.hold}
+          highlightColor={pathPulse.highlightColor}
+          borderRadius={borderRadius}
+        />
+      ) : null}
       {hatched ? (
         <div
           aria-hidden
