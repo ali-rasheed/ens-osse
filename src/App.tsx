@@ -14,6 +14,7 @@ import {
 import type {
   AnimationConfig,
   DiagramConfig,
+  PathPulseConfig,
 } from "./components/RegistryDiagram/types"
 import {
   APP_CHROME_BY_MODE,
@@ -174,6 +175,71 @@ export default function App() {
       },
     }
   )
+
+  const pathPulseDials = useDialKit("Path pulse", {
+    enabled: {
+      type: "select" as const,
+      options: [
+        { value: "off", label: "Off" },
+        { value: "on", label: "On" },
+      ],
+      default: "off",
+    },
+    from: {
+      type: "text" as const,
+      default: "registry-root",
+      placeholder: "Start node id",
+    },
+    to: {
+      type: "text" as const,
+      default: "resolvers",
+      placeholder: "End node id",
+    },
+    stagger: dialNumSelect(0.08, [
+      0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.16, 0.2, 0.24, 0.32, 0.4,
+    ], (n) => `${n}s`),
+    segmentDuration: dialNumSelect(
+      0.35,
+      [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.75, 1.0],
+      (n) => `${n}s`
+    ),
+    hold: dialNumSelect(
+      0,
+      [0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1.0],
+      (n) => `${n}s`
+    ),
+    includeEdges: {
+      type: "select" as const,
+      options: [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" },
+      ],
+      default: "yes",
+    },
+    highlight: { type: "color" as const, default: "#0082bb" },
+  })
+
+  const pathPulseConfig = useMemo((): PathPulseConfig | null => {
+    if (pathPulseDials.enabled !== "on") return null
+    return {
+      from: pathPulseDials.from.trim() || "registry-root",
+      to: pathPulseDials.to.trim() || "resolvers",
+      stagger: Number(pathPulseDials.stagger),
+      segmentDuration: Number(pathPulseDials.segmentDuration),
+      hold: Number(pathPulseDials.hold),
+      includeEdges: pathPulseDials.includeEdges === "yes",
+      highlightColor: pathPulseDials.highlight,
+    }
+  }, [
+    pathPulseDials.enabled,
+    pathPulseDials.from,
+    pathPulseDials.to,
+    pathPulseDials.stagger,
+    pathPulseDials.segmentDuration,
+    pathPulseDials.hold,
+    pathPulseDials.includeEdges,
+    pathPulseDials.highlight,
+  ])
 
   const [mermaid, setMermaid] = useState(DEFAULT_MERMAID)
   const parsed = useMemo(() => parseMermaid(mermaid), [mermaid])
@@ -347,6 +413,7 @@ export default function App() {
             edges={parsed.edges}
             animation={animationConfig}
             config={config}
+            pathPulse={pathPulseConfig}
           />
         </main>
 
