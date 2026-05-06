@@ -47,23 +47,32 @@ function mermaidDocPanelBody(md: string): string {
 }
 
 /**
- * DialKit numeric parameters as `<select>` dropdowns (resolved values are strings).
- * Use `Number(...)` when wiring into `DiagramConfig` / `AnimationConfig`.
+ * DialKit numeric parameters as free-form text so custom values can be typed.
+ * `parseDialNumber` accepts plain numbers and unit-suffixed values (`16px`, `0.08s`, `0.05em`).
  */
 function dialNumSelect(
   defaultVal: number,
   choices: readonly number[],
   formatLabel: (n: number) => string = (n) => String(n)
-): { type: "select"; options: { value: string; label: string }[]; default: string } {
+): { type: "text"; default: string; placeholder: string } {
+  const sample = choices.length > 0 ? choices[0] : defaultVal
   return {
-    type: "select" as const,
-    options: choices.map((n) => ({ value: String(n), label: formatLabel(n) })),
+    type: "text" as const,
     default: String(defaultVal),
+    placeholder: `e.g. ${formatLabel(sample)}`,
   }
 }
 
 function dialPxSelect(defaultVal: number, choices: readonly number[]) {
   return dialNumSelect(defaultVal, choices, (n) => `${n}px`)
+}
+
+function parseDialNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  const match = String(value ?? "").trim().match(/-?\d*\.?\d+/)
+  if (!match) return fallback
+  const parsed = Number(match[0])
+  return Number.isFinite(parsed) ? parsed : fallback
 }
 
 export default function App() {
@@ -81,6 +90,7 @@ export default function App() {
    */
   const registryCards = useDialKit("Registry cards", {
     primary: {
+      _collapsed: true,
       fontSize: dialPxSelect(16, [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40]),
       /** Stroke + primary title on dark canvas; light/protocol still use palette for contrast. */
       color: { type: "color" as const, default: "#ffffff" },
@@ -91,17 +101,19 @@ export default function App() {
       ),
     },
     frame: {
+      _collapsed: false,
       paddingH: dialPxSelect(16, [4, 8, 12, 16, 20, 24, 32, 40, 48]),
       paddingV: dialPxSelect(10, [4, 6, 8, 10, 12, 16, 20, 24, 28, 32]),
-      borderRadius: dialPxSelect(6, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24]),
-      nestedBorderRadius: dialPxSelect(24, [0, 6, 12, 18, 24, 30, 36, 42, 48]),
+      borderRadius: dialPxSelect(2, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24]),
+      nestedBorderRadius: dialPxSelect(12, [0, 6, 12, 18, 24, 30, 36, 42, 48]),
       borderWidth: dialNumSelect(0.5, [0.5, 1, 1.5, 2, 2.5, 3, 4], (n) => `${n}px`),
     },
     owner: {
+      _collapsed: false,
       fontSize: dialPxSelect(14, [8, 10, 12, 14, 16, 18, 20, 24, 28, 32]),
       paddingH: dialPxSelect(22, [0, 8, 12, 16, 22, 24, 32, 40, 48]),
       paddingV: dialPxSelect(5, [0, 4, 5, 8, 10, 12, 16, 20, 24, 28, 32]),
-      pillRadius: dialPxSelect(2, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32]),
+      pillRadius: dialPxSelect(4, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32]),
       textColor: { type: "color" as const, default: "#e1e1e0" },
       letterSpacing: dialNumSelect(
         0.05,
@@ -112,40 +124,64 @@ export default function App() {
   })
 
   const labels = useDialKit("Labels (pills)", {
-    /** Pill chrome + hatch only; typography for registry slots lives under Registry cards → owner. */
-    surfaceFill: { type: "color" as const, default: "#2a2a2a" },
-    surfaceBorder: { type: "color" as const, default: "#3d3d3d" },
-    surfaceBorderWidth: dialNumSelect(1, [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3], (n) => `${n}px`),
-    hatchBase: { type: "color" as const, default: "#1c1c1c" },
-    hatchStripe1: { type: "color" as const, default: "#6a6a6a" },
-    hatchStripe2: { type: "color" as const, default: "#565656" },
+    appearance: {
+      _collapsed: true,
+      /** Pill chrome + hatch only; typography for registry slots lives under Registry cards → owner. */
+      surfaceFill: { type: "color" as const, default: "#2a2a2a" },
+      surfaceBorder: { type: "color" as const, default: "#3d3d3d" },
+      surfaceBorderWidth: dialNumSelect(1, [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3], (n) => `${n}px`),
+    },
+    hatch: {
+      _collapsed: true,
+      hatchBase: { type: "color" as const, default: "#1c1c1c" },
+      hatchStripe1: { type: "color" as const, default: "#6a6a6a" },
+      hatchStripe2: { type: "color" as const, default: "#565656" },
+    },
   })
 
   const resolver = useDialKit("Resolver", {
-    fontSize: dialPxSelect(17, [8, 10, 12, 14, 16, 17, 18, 20, 24, 28, 32, 36, 40]),
-    paddingH: dialPxSelect(30, [0, 8, 16, 24, 30, 40, 48, 64, 80, 96, 120]),
-    paddingV: dialPxSelect(15, [0, 8, 10, 12, 15, 20, 24, 32, 40, 48, 64, 80]),
-    borderRadius: dialPxSelect(19, [0, 4, 8, 12, 16, 19, 24, 28, 32, 40]),
-    borderWidth: dialNumSelect(0.5, [0.5, 1, 1.5, 2, 2.5, 3, 4], (n) => `${n}px`),
-    frameInset: dialPxSelect(0, [0, 4, 8, 10, 12, 16, 20, 24, 32, 40]),
-    radiusBonus: dialPxSelect(0, [0, 4, 8, 12, 16, 20, 24, 32]),
-    socketSize: dialPxSelect(4, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32]),
-    socketOverhang: dialPxSelect(0, [0, 4, 6, 8, 10, 12, 16, 20]),
-    minWidth: dialPxSelect(140, [120, 140, 160, 200, 240, 291, 320, 400, 480, 600]),
-    minHeight: dialPxSelect(50, [48, 50, 64, 80, 96, 115, 140, 180, 240, 300]),
-    dashLength: dialPxSelect(5, [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24, 32]),
-    dashGap: dialPxSelect(6, [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24, 32]),
+    frame: {
+      _collapsed: true,
+      fontSize: dialPxSelect(17, [8, 10, 12, 14, 16, 17, 18, 20, 24, 28, 32, 36, 40]),
+      paddingH: dialPxSelect(30, [0, 8, 16, 24, 30, 40, 48, 64, 80, 96, 120]),
+      paddingV: dialPxSelect(15, [0, 8, 10, 12, 15, 20, 24, 32, 40, 48, 64, 80]),
+      borderRadius: dialPxSelect(19, [0, 4, 8, 12, 16, 19, 24, 28, 32, 40]),
+      borderWidth: dialNumSelect(0.5, [0.5, 1, 1.5, 2, 2.5, 3, 4], (n) => `${n}px`),
+      frameInset: dialPxSelect(0, [0, 4, 8, 10, 12, 16, 20, 24, 32, 40]),
+      radiusBonus: dialPxSelect(0, [0, 4, 8, 12, 16, 20, 24, 32]),
+    },
+    sockets: {
+      _collapsed: true,
+      socketSize: dialPxSelect(4, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32]),
+      socketOverhang: dialPxSelect(0, [0, 4, 6, 8, 10, 12, 16, 20]),
+    },
+    size: {
+      _collapsed: true,
+      minWidth: dialPxSelect(140, [120, 140, 160, 200, 240, 291, 320, 400, 480, 600]),
+      minHeight: dialPxSelect(50, [48, 50, 64, 80, 96, 115, 140, 180, 240, 300]),
+    },
+    dash: {
+      _collapsed: true,
+      dashLength: dialPxSelect(5, [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24, 32]),
+      dashGap: dialPxSelect(6, [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24, 32]),
+    },
   })
 
   const edges = useDialKit("Edges", {
-    strokeWidth: dialNumSelect(1, [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4], (n) => `${n}px`),
-    cornerRadius: dialPxSelect(17, [0, 4, 8, 12, 16, 17, 20, 24, 32, 40, 48]),
-    dotRadius: dialNumSelect(3.5, [1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8, 10], (n) => `${n}px`),
+    style: {
+      _collapsed: true,
+      strokeWidth: dialNumSelect(1, [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4], (n) => `${n}px`),
+      cornerRadius: dialPxSelect(17, [0, 4, 8, 12, 16, 17, 20, 24, 32, 40, 48]),
+      dotRadius: dialNumSelect(3.5, [1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8, 10], (n) => `${n}px`),
+    },
   })
 
   const layout = useDialKit("Layout", {
-    ranksep: dialPxSelect(70, [20, 32, 40, 50, 60, 70, 80, 96, 120, 160, 200]),
-    nodesep: dialPxSelect(50, [10, 20, 32, 40, 50, 60, 80, 100, 120, 150]),
+    spacing: {
+      _collapsed: true,
+      ranksep: dialPxSelect(70, [20, 32, 40, 50, 60, 70, 80, 96, 120, 160, 200]),
+      nodesep: dialPxSelect(50, [10, 20, 32, 40, 50, 60, 80, 100, 120, 150]),
+    },
   })
 
   const [key, setKey] = useState(0)
@@ -154,18 +190,21 @@ export default function App() {
   const animation = useDialKit(
     "Animation",
     {
-      preset: {
-        type: "select" as const,
-        options: [...ANIMATION_PRESET_OPTIONS],
-        default: DEFAULT_ANIMATION_CONFIG.preset!,
-      },
-      stagger: dialNumSelect(DEFAULT_ANIMATION_CONFIG.stagger!, [
-        0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.16, 0.2, 0.24, 0.32, 0.4,
-      ], (n) => `${n}s`),
-      spring: DEFAULT_ANIMATION_CONFIG.spring as {
-        type: "spring"
-        visualDuration: number
-        bounce: number
+      controls: {
+        _collapsed: true,
+        preset: {
+          type: "select" as const,
+          options: [...ANIMATION_PRESET_OPTIONS],
+          default: DEFAULT_ANIMATION_CONFIG.preset!,
+        },
+        stagger: dialNumSelect(DEFAULT_ANIMATION_CONFIG.stagger!, [
+          0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.16, 0.2, 0.24, 0.32, 0.4,
+        ], (n) => `${n}s`),
+        spring: DEFAULT_ANIMATION_CONFIG.spring as {
+          type: "spring"
+          visualDuration: number
+          bounce: number
+        },
       },
       replay: { type: "action" as const, label: "Replay" },
     },
@@ -177,68 +216,71 @@ export default function App() {
   )
 
   const pathPulseDials = useDialKit("Path pulse", {
-    enabled: {
-      type: "select" as const,
-      options: [
-        { value: "off", label: "Off" },
-        { value: "on", label: "On" },
-      ],
-      default: "off",
+    controls: {
+      _collapsed: true,
+      enabled: {
+        type: "select" as const,
+        options: [
+          { value: "off", label: "Off" },
+          { value: "on", label: "On" },
+        ],
+        default: "off",
+      },
+      from: {
+        type: "text" as const,
+        default: "registry-root",
+        placeholder: "Start node id",
+      },
+      to: {
+        type: "text" as const,
+        default: "resolvers",
+        placeholder: "End node id",
+      },
+      stagger: dialNumSelect(0.08, [
+        0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.16, 0.2, 0.24, 0.32, 0.4,
+      ], (n) => `${n}s`),
+      segmentDuration: dialNumSelect(
+        0.35,
+        [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.75, 1.0],
+        (n) => `${n}s`
+      ),
+      hold: dialNumSelect(
+        0,
+        [0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1.0],
+        (n) => `${n}s`
+      ),
+      includeEdges: {
+        type: "select" as const,
+        options: [
+          { value: "yes", label: "Yes" },
+          { value: "no", label: "No" },
+        ],
+        default: "yes",
+      },
+      highlight: { type: "color" as const, default: "#0082bb" },
     },
-    from: {
-      type: "text" as const,
-      default: "registry-root",
-      placeholder: "Start node id",
-    },
-    to: {
-      type: "text" as const,
-      default: "resolvers",
-      placeholder: "End node id",
-    },
-    stagger: dialNumSelect(0.08, [
-      0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.16, 0.2, 0.24, 0.32, 0.4,
-    ], (n) => `${n}s`),
-    segmentDuration: dialNumSelect(
-      0.35,
-      [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.75, 1.0],
-      (n) => `${n}s`
-    ),
-    hold: dialNumSelect(
-      0,
-      [0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1.0],
-      (n) => `${n}s`
-    ),
-    includeEdges: {
-      type: "select" as const,
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" },
-      ],
-      default: "yes",
-    },
-    highlight: { type: "color" as const, default: "#0082bb" },
   })
 
   const pathPulseConfig = useMemo((): PathPulseConfig | null => {
-    if (pathPulseDials.enabled !== "on") return null
+    if (pathPulseDials.controls.enabled !== "on") return null
     return {
-      from: pathPulseDials.from.trim() || "registry-root",
-      to: pathPulseDials.to.trim() || "resolvers",
-      stagger: Number(pathPulseDials.stagger),
-      segmentDuration: Number(pathPulseDials.segmentDuration),
-      hold: Number(pathPulseDials.hold),
-      includeEdges: pathPulseDials.includeEdges === "yes",
-      highlightColor: pathPulseDials.highlight,
+      from: pathPulseDials.controls.from.trim() || "registry-root",
+      to: pathPulseDials.controls.to.trim() || "resolvers",
+      stagger: parseDialNumber(pathPulseDials.controls.stagger),
+      segmentDuration: parseDialNumber(pathPulseDials.controls.segmentDuration),
+      hold: parseDialNumber(pathPulseDials.controls.hold),
+      includeEdges: pathPulseDials.controls.includeEdges === "yes",
+      highlightColor: pathPulseDials.controls.highlight,
     }
   }, [
-    pathPulseDials.enabled,
-    pathPulseDials.from,
-    pathPulseDials.to,
-    pathPulseDials.stagger,
-    pathPulseDials.segmentDuration,
-    pathPulseDials.hold,
-    pathPulseDials.includeEdges,
-    pathPulseDials.highlight,
+    pathPulseDials.controls.enabled,
+    pathPulseDials.controls.from,
+    pathPulseDials.controls.to,
+    pathPulseDials.controls.stagger,
+    pathPulseDials.controls.segmentDuration,
+    pathPulseDials.controls.hold,
+    pathPulseDials.controls.includeEdges,
+    pathPulseDials.controls.highlight,
   ])
 
   const [mermaid, setMermaid] = useState(DEFAULT_MERMAID)
@@ -254,62 +296,62 @@ export default function App() {
   useEffect(() => {
     replay()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: preset-only
-  }, [animation.preset])
+  }, [animation.controls.preset])
 
   /** Dark canvas: Labels dials own pill/hatch hex (charcoal chip). Light/protocol keep Figma palette. */
   const labelPaintFromDials = mode === "dark"
 
   const config: DiagramConfig = {
     mode,
-    fontSize: Number(registryCards.primary.fontSize),
-    paddingH: Number(registryCards.frame.paddingH),
-    paddingV: Number(registryCards.frame.paddingV),
-    borderRadius: Number(registryCards.frame.borderRadius),
-    nestedRegistryBorderRadius: Number(registryCards.frame.nestedBorderRadius),
-    borderWidth: Number(registryCards.frame.borderWidth),
+    fontSize: parseDialNumber(registryCards.primary.fontSize),
+    paddingH: parseDialNumber(registryCards.frame.paddingH),
+    paddingV: parseDialNumber(registryCards.frame.paddingV),
+    borderRadius: parseDialNumber(registryCards.frame.borderRadius),
+    nestedRegistryBorderRadius: parseDialNumber(registryCards.frame.nestedBorderRadius),
+    borderWidth: parseDialNumber(registryCards.frame.borderWidth),
     nodeColor: mode === "dark" ? registryCards.primary.color : palette.nodeColor,
-    primaryLetterSpacing: Number(registryCards.primary.letterSpacing),
-    labelSurfaceFill: labelPaintFromDials ? labels.surfaceFill : palette.labelSurfaceFill,
+    primaryLetterSpacing: parseDialNumber(registryCards.primary.letterSpacing),
+    labelSurfaceFill: labelPaintFromDials ? labels.appearance.surfaceFill : palette.labelSurfaceFill,
     labelSurfaceBorder: labelPaintFromDials
-      ? `${Number(labels.surfaceBorderWidth)}px solid ${labels.surfaceBorder}`
+      ? `${parseDialNumber(labels.appearance.surfaceBorderWidth)}px solid ${labels.appearance.surfaceBorder}`
       : palette.labelSurfaceBorder,
-    hatchBase: labelPaintFromDials ? labels.hatchBase : palette.hatchBase,
-    hatchStripe1: labelPaintFromDials ? labels.hatchStripe1 : palette.hatchStripe1,
-    hatchStripe2: labelPaintFromDials ? labels.hatchStripe2 : palette.hatchStripe2,
-    labelFontSize: Number(registryCards.owner.fontSize),
-    labelPaddingH: Number(registryCards.owner.paddingH),
-    labelPaddingV: Number(registryCards.owner.paddingV),
+    hatchBase: labelPaintFromDials ? labels.hatch.hatchBase : palette.hatchBase,
+    hatchStripe1: labelPaintFromDials ? labels.hatch.hatchStripe1 : palette.hatchStripe1,
+    hatchStripe2: labelPaintFromDials ? labels.hatch.hatchStripe2 : palette.hatchStripe2,
+    labelFontSize: parseDialNumber(registryCards.owner.fontSize),
+    labelPaddingH: parseDialNumber(registryCards.owner.paddingH),
+    labelPaddingV: parseDialNumber(registryCards.owner.paddingV),
     labelColor: labelPaintFromDials ? registryCards.owner.textColor : palette.labelColor,
-    labelBorderRadius: Number(registryCards.owner.pillRadius),
-    labelLetterSpacing: Number(registryCards.owner.letterSpacing),
-    resolverFontSize: Number(resolver.fontSize),
-    resolverPaddingH: Number(resolver.paddingH),
-    resolverPaddingV: Number(resolver.paddingV),
-    resolverBorderRadius: Number(resolver.borderRadius),
-    resolverBorderWidth: Number(resolver.borderWidth),
+    labelBorderRadius: parseDialNumber(registryCards.owner.pillRadius),
+    labelLetterSpacing: parseDialNumber(registryCards.owner.letterSpacing),
+    resolverFontSize: parseDialNumber(resolver.frame.fontSize),
+    resolverPaddingH: parseDialNumber(resolver.frame.paddingH),
+    resolverPaddingV: parseDialNumber(resolver.frame.paddingV),
+    resolverBorderRadius: parseDialNumber(resolver.frame.borderRadius),
+    resolverBorderWidth: parseDialNumber(resolver.frame.borderWidth),
     resolverColor: palette.resolverColor,
     resolverSurfaceFill: palette.resolverSurfaceFill,
     resolverSocketColor: palette.resolverSocketColor,
-    resolverFrameInset: Number(resolver.frameInset),
-    resolverRadiusBonus: Number(resolver.radiusBonus),
-    resolverSocketSize: Number(resolver.socketSize),
-    resolverSocketOverhang: Number(resolver.socketOverhang),
-    resolverMinWidth: Number(resolver.minWidth),
-    resolverMinHeight: Number(resolver.minHeight),
-    resolverDashLength: Number(resolver.dashLength),
-    resolverDashGap: Number(resolver.dashGap),
-    strokeWidth: Number(edges.strokeWidth),
-    cornerRadius: Number(edges.cornerRadius),
-    dotRadius: Number(edges.dotRadius),
+    resolverFrameInset: parseDialNumber(resolver.frame.frameInset),
+    resolverRadiusBonus: parseDialNumber(resolver.frame.radiusBonus),
+    resolverSocketSize: parseDialNumber(resolver.sockets.socketSize),
+    resolverSocketOverhang: parseDialNumber(resolver.sockets.socketOverhang),
+    resolverMinWidth: parseDialNumber(resolver.size.minWidth),
+    resolverMinHeight: parseDialNumber(resolver.size.minHeight),
+    resolverDashLength: parseDialNumber(resolver.dash.dashLength),
+    resolverDashGap: parseDialNumber(resolver.dash.dashGap),
+    strokeWidth: parseDialNumber(edges.style.strokeWidth),
+    cornerRadius: parseDialNumber(edges.style.cornerRadius),
+    dotRadius: parseDialNumber(edges.style.dotRadius),
     edgeColor: palette.edgeColor,
-    ranksep: Number(layout.ranksep),
-    nodesep: Number(layout.nodesep),
+    ranksep: parseDialNumber(layout.spacing.ranksep),
+    nodesep: parseDialNumber(layout.spacing.nodesep),
   }
 
   const animationConfig: AnimationConfig = {
-    preset: animation.preset as AnimationConfig["preset"],
-    stagger: Number(animation.stagger),
-    spring: animation.spring,
+    preset: animation.controls.preset as AnimationConfig["preset"],
+    stagger: parseDialNumber(animation.controls.stagger),
+    spring: animation.controls.spring,
   }
 
   const mainBackground =
@@ -787,8 +829,9 @@ function MermaidInput({
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: 4,
           padding: "10px 12px",
           borderBottom: chrome.panelBorder,
           color: chrome.text,
