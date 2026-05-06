@@ -2,10 +2,20 @@
  * Dagre layout for registry / label / resolver nodes, plus deterministic sizing for
  * compound registry frames (header + hatched slots) and optional edge anchors
  * on slot bottom-centers (Figma Diagram System ports). Edge polylines are
- * orthogonalized to axis-aligned segments (90° only); paths use no corner curves.
+ * orthogonalized to axis-aligned segments (90° only); `pointsToPath` fillets 90° bends
+ * using the layout `cornerRadius` (quadratic beziers). Final approach legs are snapped to
+ * the target node’s top/bottom center (vertical tail) or left/right center (horizontal tail)
+ * so the arrow meets the frame on-axis (skipped when `toSlotIndex` pins the head to a slot).
  */
 import dagre from "dagre"
-import type { NodeData, EdgeData, LayoutResult, PositionedNode, PositionedEdge } from "./types"
+import type {
+  NodeData,
+  EdgeData,
+  EdgeOrthogonalStyle,
+  LayoutResult,
+  PositionedNode,
+  PositionedEdge,
+} from "./types"
 
 // Char-width ratios per font (px per character at 1px fontSize)
 const CHAR_RATIO = { registry: 0.6, dashed: 0.6, label: 0.5 }
@@ -164,8 +174,21 @@ function isAxisAligned(
   return Math.abs(a.x - b.x) < ORTH_EPS || Math.abs(a.y - b.y) < ORTH_EPS
 }
 
-/** Insert elbows so every segment is horizontal or vertical (Manhattan routing). */
-function orthogonalizePolyline(points: { x: number; y: number }[]): { x: number; y: number }[] {
+function effectiveOrthogonalStyle(edge: EdgeData): EdgeOrthogonalStyle {
+  if (edge.orthogonalStyle === "hv" || edge.orthogonalStyle === "vhv") return edge.orthogonalStyle
+  if (edge.fromSlotIndex !== undefined) return "vhv"
+  return "hv"
+}
+
+/**
+ * Insert elbows so every segment is horizontal or vertical (Manhattan routing).
+ * `hv`: one corner (horizontal at start Y, then vertical). `vhv`: jog at mid‑Y
+ * (vertical → horizontal → vertical), for “drop from port, run across, drop to target”.
+ */
+function orthogonalizePolyline(
+  points: { x: number; y: number }[],
+  style: EdgeOrthogonalStyle
+): { x: number; y: number }[] {
   if (points.length < 2) return points.slice()
 
   const out: { x: number; y: number }[] = [points[0]]
@@ -178,13 +201,83 @@ function orthogonalizePolyline(points: { x: number; y: number }[]): { x: number;
       out.push(b)
       continue
     }
-    // Horizontal then vertical: (a)→(b.x, a.y)→(b)
+    if (style === "vhv") {
+      const yMid = (a.y + b.y) / 2
+      const p1 = { x: a.x, y: yMid }
+      const p2 = { x: b.x, y: yMid }
+      if (Math.hypot(p1.x - a.x, p1.y - a.y) >= ORTH_EPS) out.push(p1)
+      if (Math.hypot(p2.x - out[out.length - 1].x, p2.y - out[out.length - 1].y) >= ORTH_EPS)
+        out.push(p2)
+      if (Math.hypot(b.x - out[out.length - 1].x, b.y - out[out.length - 1].y) >= ORTH_EPS)
+        out.push(b)
+      continue
+    }
+    // `hv`: horizontal then vertical — (a)→(b.x, a.y)→(b)
     const elbow = { x: b.x, y: a.y }
     if (Math.hypot(elbow.x - a.x, elbow.y - a.y) >= ORTH_EPS) out.push(elbow)
     out.push(b)
   }
 
   return simplifyAxisCollinear(out)
+}
+
+/**
+ * Walk backward from the end along co-linear vertical segments (same x), then set that
+ * run’s x to `cx` so the elbow + tail stay orthogonal (avoids only moving the tip).
+ */
+function snapFinalVerticalRunToX(points: { x: number; y: number }[], cx: number): void {
+  const n = points.length
+  if (n < 2) return
+  const endX = points[n - 1].x
+  let k = n - 1
+  while (k > 0) {
+    const sameX = Math.abs(points[k - 1].x - endX) < ORTH_EPS
+    const verticalSeg = Math.abs(points[k].y - points[k - 1].y) >= ORTH_EPS
+    if (sameX && verticalSeg) {
+      k--
+      continue
+    }
+    break
+  }
+  for (let i = k; i < n; i++) {
+    if (Math.abs(points[i].x - endX) < ORTH_EPS) points[i].x = cx
+  }
+}
+
+/** Same as `snapFinalVerticalRunToX` but for a horizontal tail (same y → `cy`). */
+function snapFinalHorizontalRunToY(points: { x: number; y: number }[], cy: number): void {
+  const n = points.length
+  if (n < 2) return
+  const endY = points[n - 1].y
+  let k = n - 1
+  while (k > 0) {
+    const sameY = Math.abs(points[k - 1].y - endY) < ORTH_EPS
+    const horizSeg = Math.abs(points[k].x - points[k - 1].x) >= ORTH_EPS
+    if (sameY && horizSeg) {
+      k--
+      continue
+    }
+    break
+  }
+  for (let i = k; i < n; i++) {
+    if (Math.abs(points[i].y - endY) < ORTH_EPS) points[i].y = cy
+  }
+}
+
+/** Align the last approach leg with the target’s attachment edge center (for arrow + rounded path). */
+function snapEdgeEndToTargetAttachment(
+  points: { x: number; y: number }[],
+  target: PositionedNode
+): void {
+  if (points.length < 2) return
+  const a = points[points.length - 2]
+  const b = points[points.length - 1]
+  const cx = target.x + target.width / 2
+  const cy = target.y + target.height / 2
+  const dx = Math.abs(b.x - a.x)
+  const dy = Math.abs(b.y - a.y)
+  if (dx < ORTH_EPS && dy >= ORTH_EPS) snapFinalVerticalRunToX(points, cx)
+  else if (dy < ORTH_EPS && dx >= ORTH_EPS) snapFinalHorizontalRunToY(points, cy)
 }
 
 /** Drop middle vertices that lie on the same axis-aligned segment as their neighbors. */
@@ -215,7 +308,8 @@ function slotCellWidths(slots: string[], opts: BoxOptions): number[] {
 
 /**
  * Bottom-center of each hatched slot in absolute graph coordinates (matches
- * `RegistryNode` flex + padding + borders).
+ * `RegistryNode` flex + padding + borders). Uses the same width as the padded
+ * inner track (`innerContentW − 2·paddingH`) for centering so ports align with pills.
  */
 export function compoundRegistrySlotBottomCenters(
   node: NodeData,
@@ -239,7 +333,9 @@ export function compoundRegistrySlotBottomCenters(
   const slotRowH = opts.labelFontSize * 1.4 + opts.labelPaddingV * 2
 
   const offset = side
-  const rowLeft = pos.x + offset + opts.paddingH + (innerContentW - slotRowInnerW) / 2
+  /** Row is centered in the inner column’s content box (inside `paddingH`), not the full inner width. */
+  const slotTrackW = innerContentW - 2 * opts.paddingH
+  const rowLeft = pos.x + offset + opts.paddingH + (slotTrackW - slotRowInnerW) / 2
   const slotRowBottomY =
     pos.y +
     offset +
@@ -263,7 +359,8 @@ function applySlotAnchors(
   nodes: PositionedNode[],
   edges: EdgeData[],
   positionedEdges: PositionedEdge[],
-  opts: BoxOptions
+  opts: BoxOptions,
+  edgeCornerRadius: number
 ): void {
   const byId = new Map(nodes.map((n) => [n.id, n]))
   const anchorCache = new Map<string, { x: number; y: number }[]>()
@@ -296,7 +393,7 @@ function applySlotAnchors(
     }
 
     pe.points = pts
-    pe.d = pointsToPath(pts, 0)
+    pe.d = pointsToPath(pts, edgeCornerRadius)
   }
 }
 
@@ -387,12 +484,20 @@ export function computeLayout(
     }
   })
 
-  applySlotAnchors(positionedNodes, edges, positionedEdges, boxOpts)
+  applySlotAnchors(positionedNodes, edges, positionedEdges, boxOpts, cornerRadius)
 
-  for (const pe of positionedEdges) {
+  const nodeById = new Map(positionedNodes.map((n) => [n.id, n]))
+
+  for (let i = 0; i < positionedEdges.length; i++) {
+    const pe = positionedEdges[i]
+    const edge = edges[i]
     if (pe.points.length >= 2) {
-      pe.points = orthogonalizePolyline(pe.points)
-      pe.d = pointsToPath(pe.points, 0)
+      pe.points = orthogonalizePolyline(pe.points, effectiveOrthogonalStyle(edge))
+      const toNode = nodeById.get(edge.to)
+      if (toNode !== undefined && edge.toSlotIndex === undefined) {
+        snapEdgeEndToTargetAttachment(pe.points, toNode)
+      }
+      pe.d = pointsToPath(pe.points, cornerRadius)
     }
   }
 

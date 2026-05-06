@@ -45,6 +45,8 @@ export function DiagramEdge({
         stroke={color}
         strokeWidth={strokeWidth}
         fill="none"
+        strokeLinejoin="round"
+        strokeLinecap="round"
       />
       <motion.path
         initial={{ opacity: 0 }}

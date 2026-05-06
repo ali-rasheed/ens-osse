@@ -23,16 +23,20 @@ function parseRegistryBracket(body: string): NodeData {
   return base
 }
 
-/** Optional tail on edge lines: `a --> b # fromSlot=0 toSlot=1` */
-function parseEdgeAnchorMeta(meta: string): Pick<EdgeData, "fromSlotIndex" | "toSlotIndex"> {
-  const o: Partial<Pick<EdgeData, "fromSlotIndex" | "toSlotIndex">> = {}
+/** Optional tail on edge lines: `a --> b # fromSlot=0 toSlot=1 route=vhv` */
+function parseEdgeAnchorMeta(
+  meta: string
+): Pick<EdgeData, "fromSlotIndex" | "toSlotIndex" | "orthogonalStyle"> {
+  const o: Partial<Pick<EdgeData, "fromSlotIndex" | "toSlotIndex" | "orthogonalStyle">> = {}
   for (const part of meta.trim().split(/\s+/)) {
     const fs = /^fromSlot=(\d+)$/.exec(part)
     if (fs) o.fromSlotIndex = Number(fs[1])
     const ts = /^toSlot=(\d+)$/.exec(part)
     if (ts) o.toSlotIndex = Number(ts[1])
+    const rt = /^route=(hv|vhv)$/.exec(part)
+    if (rt) o.orthogonalStyle = rt[1] as EdgeData["orthogonalStyle"]
   }
-  return o as Pick<EdgeData, "fromSlotIndex" | "toSlotIndex">
+  return o as Pick<EdgeData, "fromSlotIndex" | "toSlotIndex" | "orthogonalStyle">
 }
 
 function splitEdgeRhs(rhs: string): { endpoint: string; meta: string } {
@@ -124,6 +128,7 @@ export function serializeMermaid(nodes: NodeData[], edges: EdgeData[]): string {
     const bits: string[] = []
     if (e.fromSlotIndex !== undefined) bits.push(`fromSlot=${e.fromSlotIndex}`)
     if (e.toSlotIndex !== undefined) bits.push(`toSlot=${e.toSlotIndex}`)
+    if (e.orthogonalStyle !== undefined) bits.push(`route=${e.orthogonalStyle}`)
     return bits.length ? ` # ${bits.join(" ")}` : ""
   }
 
