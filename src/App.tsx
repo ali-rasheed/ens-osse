@@ -24,25 +24,58 @@ import { parseMermaid, serializeMermaid } from "./lib/mermaid"
 import { buildDocsEmbedSnippet } from "./lib/docsEmbed"
 import { downloadDiagramPng, type ExportScale } from "./lib/exportPng"
 
-/** Default graph uses compound registry nodes + slot arrow anchors (Figma Diagram System). */
+/**
+ * Default graph: nested registries inside one compound frame + edge to Resolvers
+ * (Figma Diagram System nested Registry reference).
+ */
 const DEFAULT_NODES: NodeData[] = [
-  { id: "root", label: "<root>", type: "registry", slots: ["eth"] },
-  { id: "eth-r", label: "eth", type: "registry", slots: ["workemon"] },
-  { id: "workemon", label: "workemon.eth", type: "registry", slots: ["delegate", "wallet"] },
-  { id: "resolver1", label: "Resolver 1", type: "dashed" },
-  { id: "delegate-r", label: "delegate.workemon.eth", type: "registry" },
-  { id: "wallet-r", label: "wallet.workemon.eth", type: "registry" },
-  { id: "wallet-child", label: "delegate", type: "labelHatched" },
+  {
+    id: "registry-root",
+    label: "Registry",
+    type: "registry",
+    children: [
+      {
+        id: "nest-root",
+        label: "<root>",
+        type: "registry",
+        slots: ["owner: 0x0123..."],
+      },
+      {
+        id: "nest-eth",
+        label: "eth",
+        type: "registry",
+        slots: ["owner: 0x0123..."],
+      },
+      {
+        id: "nest-workemon",
+        label: "workemon.eth",
+        type: "registry",
+        slots: ["owner: 0x0123..."],
+      },
+      {
+        id: "nest-wallet",
+        label: "wallet.workemon.eth",
+        type: "registry",
+        children: [
+          { id: "w-owner", label: "owner: 0x0123...", type: "label" },
+          { id: "w-res", label: "resolver: 0x6789...", type: "dashed" },
+        ],
+      },
+      {
+        id: "nest-delegate",
+        label: "delegate.workemon.eth",
+        type: "registry",
+        children: [
+          { id: "d-owner", label: "owner: 0x0123...", type: "label" },
+          { id: "d-res", label: "resolver: 0x6789...", type: "dashed" },
+        ],
+      },
+    ],
+  },
+  { id: "resolvers", label: "Resolvers", type: "dashed" },
 ]
 
-const DEFAULT_EDGES: EdgeData[] = [
-  { from: "root", to: "eth-r", fromSlotIndex: 0 },
-  { from: "eth-r", to: "workemon", fromSlotIndex: 0 },
-  { from: "eth-r", to: "resolver1", fromSlotIndex: 0 },
-  { from: "workemon", to: "delegate-r", fromSlotIndex: 0 },
-  { from: "workemon", to: "wallet-r", fromSlotIndex: 1 },
-  { from: "wallet-r", to: "wallet-child" },
-]
+const DEFAULT_EDGES: EdgeData[] = [{ from: "registry-root", to: "resolvers" }]
 
 const DEFAULT_MERMAID = serializeMermaid(DEFAULT_NODES, DEFAULT_EDGES)
 
@@ -136,6 +169,7 @@ export default function App() {
     paddingH: nodes.paddingH,
     paddingV: nodes.paddingV,
     borderRadius: nodes.borderRadius,
+    nestedRegistryBorderRadius: nodes.borderRadius + 18,
     borderWidth: nodes.borderWidth,
     nodeColor: palette.nodeColor,
     labelSurfaceFill: palette.labelSurfaceFill,
@@ -153,6 +187,7 @@ export default function App() {
     resolverBorderRadius: resolver.borderRadius,
     resolverBorderWidth: resolver.borderWidth,
     resolverColor: palette.resolverColor,
+    resolverSocketColor: palette.resolverSocketColor,
     resolverFrameInset: resolver.frameInset,
     resolverRadiusBonus: resolver.radiusBonus,
     resolverSocketSize: resolver.socketSize,
