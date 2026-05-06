@@ -1,0 +1,68 @@
+.sidebar-dialkit,
+.sidebar-dialkit > * {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+.sidebar-dialkit > * {
+  width: 100%;
+}
+
+/* Nested DialKit inline panel still sets height:100%; break the chain so the aside scrolls and Mermaid stays reachable. */
+.sidebar-dialkit .dialkit-root[data-mode="inline"],
+.sidebar-dialkit .dialkit-panel[data-mode="inline"],
+.sidebar-dialkit .dialkit-panel[data-mode="inline"] .dialkit-panel-wrapper {
+  height: auto !important;
+  max-height: none !important;
+}
+
+/* Stack diagram above controls on narrow screens so the canvas is never squeezed to zero width. */
+@media (max-width: 800px) {
+  .app-shell-body {
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  .app-main {
+    min-width: 100% !important;
+    width: 100%;
+    min-height: min(70vh, 640px);
+    flex: 1 1 auto !important;
+    padding: 24px 16px !important;
+  }
+
+  .app-aside {
+    width: 100% !important;
+    flex: 0 0 auto !important;
+    max-height: none;
+    height: auto;
+    min-height: 0;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .app-shell[data-theme="light"] .app-aside {
+    border-top: 1px solid color-mix(in srgb, #595755 25%, transparent);
+  }
+
+  .app-shell[data-theme="protocol"] .app-aside {
+    border-top: 1px solid color-mix(in srgb, #0082bb 30%, transparent);
+  }
+}
+
+/* Native disclosure: custom caret (summary uses list-style: none inline). */
+.mermaid-onboarding summary::-webkit-details-marker {
+  display: none;
+}
+
+.mermaid-onboarding summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+}
+
+.mermaid-onboarding[open] summary::before {
+  transform: rotate(90deg);
+}

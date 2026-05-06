@@ -1,0 +1,203 @@
+/**
+ * ENS on-stack fonts: woff2 files live in /public/fonts (copied from local ENS Fonts bundle).
+ * Families: ABC Monument Grotesk (+ Semi-Mono, Mono, Variable), ABC Marist.
+ */
+
+/* --- ABC Monument Grotesk --- */
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Thin.woff2") format("woff2");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-ThinItalic.woff2") format("woff2");
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-LightItalic.woff2") format("woff2");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-RegularItalic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-MediumItalic.woff2") format("woff2");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Heavy.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-HeavyItalic.woff2") format("woff2");
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Black.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-BlackItalic.woff2") format("woff2");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-Ultra.woff2") format("woff2");
+  font-weight: 950;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk";
+  src: url("/fonts/ABCMonumentGrotesk-UltraItalic.woff2") format("woff2");
+  font-weight: 950;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* --- ABC Monument Grotesk Semi-Mono --- */
+@font-face {
+  font-family: "ABC Monument Grotesk Semi-Mono";
+  src: url("/fonts/ABCMonumentGroteskSemi-Mono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk Semi-Mono";
+  src: url("/fonts/ABCMonumentGroteskSemi-Mono-RegularItalic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk Semi-Mono";
+  src: url("/fonts/ABCMonumentGroteskSemi-Mono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk Semi-Mono";
+  src: url("/fonts/ABCMonumentGroteskSemi-Mono-MediumItalic.woff2") format("woff2");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* --- ABC Monument Grotesk Mono --- */
+@font-face {
+  font-family: "ABC Monument Grotesk Mono";
+  src: url("/fonts/ABCMonumentGroteskMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk Mono";
+  src: url("/fonts/ABCMonumentGroteskMono-RegularItalic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk Mono";
+  src: url("/fonts/ABCMonumentGroteskMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Monument Grotesk Mono";
+  src: url("/fonts/ABCMonumentGroteskMono-MediumItalic.woff2") format("woff2");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* --- ABC Monument Grotesk Variable --- */
+@font-face {
+  font-family: "ABC Monument Grotesk Variable";
+  src: url("/fonts/ABCMonumentGroteskVariable.woff2") format("woff2-variations");
+  font-weight: 100 950;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* --- ABC Marist --- */
+@font-face {
+  font-family: "ABC Marist";
+  src: url("/fonts/ABCMarist-Book.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ABC Marist";
+  src: url("/fonts/ABCMarist-BookItalic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}

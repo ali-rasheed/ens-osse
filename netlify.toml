@@ -1,0 +1,9 @@
+# Netlify: Vite SPA — build output is `dist`; client routes fall back to index.html.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
