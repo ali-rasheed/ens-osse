@@ -2,6 +2,11 @@
  * Dashed “resolver” frame with corner sockets. Socket squares use a small radius to match
  * Diagram System corner markers (e.g. 2px rounding).
  *
+ * **`embedded`:** nested under a registry `children` column — geometry matches Diagram System
+ * Resolver inner frame (Figma `78:806`): 2px dash, 4px radius, 8px sockets, 28×20 content pad
+ * (see `DIAGRAM_SYSTEM_EMBEDDED_RESOLVER` in `layout.ts`). Top-level nodes use `DiagramConfig` /
+ * DialKit sizing.
+ *
  * With `stackDepth` > 1, draws duplicate frames offset down-right via `DiagonalStack` (Mermaid
  * `id{label # stack=N}`); only the front layer shows the label.
  */
@@ -34,6 +39,7 @@ interface LayerProps {
   dashGap: number
   /** Back layers: dashed frame + sockets only (no text). */
   frameOnly: boolean
+  labelLetterSpacing: string
 }
 
 function DashedLayerFrame({
@@ -55,6 +61,7 @@ function DashedLayerFrame({
   dashLength,
   dashGap,
   frameOnly,
+  labelLetterSpacing,
 }: LayerProps) {
   const textColor = labelColor ?? color
   const strokeInset = frameInset + borderWidth / 2
@@ -139,7 +146,7 @@ function DashedLayerFrame({
             fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
             fontWeight: 500,
             fontSize,
-            letterSpacing: "0.05em",
+            letterSpacing: labelLetterSpacing,
             color: textColor,
             whiteSpace: "nowrap",
           }}
@@ -167,7 +174,7 @@ interface Props {
   color?: string
   /** Corner sockets; defaults to `color` when omitted. */
   socketColor?: string
-  /** Resolver center label; defaults to `color`. */
+  /** Center label color; defaults to `color` (stroke). */
   labelColor?: string
   frameInset?: number
   radiusBonus?: number
@@ -207,13 +214,15 @@ export function DashedNode({
   stackDepth = 1,
   surfaceFill = "transparent",
 }: Props) {
+  const centerLabelColor = labelColor ?? color
   const socketFill = socketColor ?? color
+  const labelLetterSpacing = embedded ? "0.02em" : "0.05em"
   const depth = Math.max(1, stackDepth ?? 1)
   const ox = RESOLVER_STACK_LAYER_OFFSET
   const innerW = width - (depth - 1) * ox
   const innerH = height - (depth - 1) * ox
 
-  const layerProps: Omit<LayerProps, "frameOnly"> = {
+  const layerPropsBase: Omit<LayerProps, "frameOnly"> = {
     label,
     width: innerW,
     height: innerH,
@@ -223,7 +232,7 @@ export function DashedNode({
     borderRadius,
     borderWidth,
     color,
-    labelColor,
+    labelColor: centerLabelColor,
     surfaceFill,
     socketColor: socketFill,
     frameInset,
@@ -231,15 +240,16 @@ export function DashedNode({
     socketSize,
     dashLength,
     dashGap,
+    labelLetterSpacing,
   }
 
   const content =
     depth <= 1 ? (
-      <DashedLayerFrame {...layerProps} frameOnly={false} />
+      <DashedLayerFrame {...layerPropsBase} frameOnly={false} />
     ) : (
       <DiagonalStack offsetX={ox} offsetY={ox}>
         {Array.from({ length: depth }, (_, i) => (
-          <DashedLayerFrame key={i} {...layerProps} frameOnly={i > 0} />
+          <DashedLayerFrame key={i} {...layerPropsBase} frameOnly={i > 0} />
         ))}
       </DiagonalStack>
     )
