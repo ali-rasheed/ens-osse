@@ -15,10 +15,12 @@ interface Props {
   borderRadius?: number
   borderWidth?: number
   color?: string
+  frameInset?: number
+  radiusBonus?: number
+  socketSize?: number
+  dashLength?: number
+  dashGap?: number
 }
-
-const DASH_PATTERN = "6 5"
-const SOCKET = 5
 
 export function DashedNode({
   label,
@@ -32,10 +34,18 @@ export function DashedNode({
   paddingH = 16,
   paddingV = 10,
   borderRadius = 6,
-  borderWidth = 1.5,
+  borderWidth = 0.5,
   color = "#ffffff",
+  frameInset = 10,
+  radiusBonus = 8,
+  socketSize = 12,
+  dashLength = 6,
+  dashGap = 5,
 }: Props) {
-  const inset = borderWidth / 2
+  const strokeInset = frameInset + borderWidth / 2
+  const socketOffset = -socketSize / 2
+  const socketMaxX = width - socketSize / 2
+  const socketMaxY = height - socketSize / 2
   return (
     <motion.div
       variants={variants}
@@ -51,30 +61,29 @@ export function DashedNode({
       <svg
         width={width}
         height={height}
-        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+        style={{ position: "absolute", inset: 0, overflow: "visible", pointerEvents: "none" }}
       >
         <rect
-          x={inset}
-          y={inset}
-          width={width - borderWidth}
-          height={height - borderWidth}
-          rx={borderRadius}
-          ry={borderRadius}
+          x={strokeInset}
+          y={strokeInset}
+          width={width - strokeInset * 2}
+          height={height - strokeInset * 2}
+          rx={borderRadius + radiusBonus}
+          ry={borderRadius + radiusBonus}
           fill="none"
           stroke={color}
           strokeWidth={borderWidth}
-          strokeDasharray={DASH_PATTERN}
+          strokeDasharray={`${dashLength} ${dashGap}`}
           strokeLinecap="butt"
         />
-        {/* Corner sockets */}
-        <rect x={0} y={0} width={SOCKET} height={SOCKET} fill={color} />
-        <rect x={width - SOCKET} y={0} width={SOCKET} height={SOCKET} fill={color} />
-        <rect x={0} y={height - SOCKET} width={SOCKET} height={SOCKET} fill={color} />
+        <rect x={socketOffset} y={socketOffset} width={socketSize} height={socketSize} fill={color} />
+        <rect x={socketMaxX} y={socketOffset} width={socketSize} height={socketSize} fill={color} />
+        <rect x={socketOffset} y={socketMaxY} width={socketSize} height={socketSize} fill={color} />
         <rect
-          x={width - SOCKET}
-          y={height - SOCKET}
-          width={SOCKET}
-          height={SOCKET}
+          x={socketMaxX}
+          y={socketMaxY}
+          width={socketSize}
+          height={socketSize}
           fill={color}
         />
       </svg>
@@ -89,6 +98,7 @@ export function DashedNode({
           fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
           fontWeight: 500,
           fontSize,
+          letterSpacing: "0.05em",
           color,
           whiteSpace: "nowrap",
         }}
