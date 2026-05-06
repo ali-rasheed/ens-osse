@@ -59,7 +59,7 @@
 
 /* Stack diagram above controls on narrow screens so the canvas is never squeezed to zero width. */
 @media (max-width: 800px) {
-  .app-shell {
+  .app-shell-body {
     flex-direction: column;
     overflow-x: hidden;
   }

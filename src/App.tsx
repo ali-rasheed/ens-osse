@@ -5,13 +5,14 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { DialRoot, useDialKit } from "dialkit"
 import "dialkit/styles.css"
-import { DiagonalStack } from "./components/DiagonalStack"
 import { RegistryDiagram } from "./components/RegistryDiagram"
+import {
+  ANIMATION_PRESET_OPTIONS,
+  DEFAULT_ANIMATION_CONFIG,
+} from "./components/RegistryDiagram/animationConfig"
 import type {
   AnimationConfig,
   DiagramConfig,
-  NodeData,
-  EdgeData,
 } from "./components/RegistryDiagram/types"
 import {
   APP_CHROME_BY_MODE,
@@ -21,66 +22,27 @@ import {
   diagramExportBackground,
   type DiagramMode,
 } from "./components/RegistryDiagram/theme"
-import { parseMermaid, serializeMermaid } from "./lib/mermaid"
+import { parseMermaid } from "./lib/mermaid"
+import {
+  MERMAID_TEMPLATES,
+  NESTED_COLUMN_MERMAID,
+  findTemplateIdForSource,
+  type MermaidTemplate,
+} from "./lib/mermaidTemplates"
+import mermaidPatternsSource from "../docs/mermaid-patterns.md?raw"
 import { buildDocsEmbedSnippet } from "./lib/docsEmbed"
 import { downloadDiagramPng, type ExportScale } from "./lib/exportPng"
+import { mergeNestedColumnDemoNodes } from "./lib/nestedColumnDemoData"
 
-/**
- * Default graph: nested registries inside one compound frame + edge to Resolvers
- * (Figma Diagram System nested Registry reference).
- */
-const DEFAULT_NODES: NodeData[] = [
-  {
-    id: "registry-root",
-    label: "Registry",
-    type: "registry",
-    children: [
-      {
-        id: "nest-root",
-        label: "<root>",
-        type: "registry",
-        slots: ["owner: 0x0123..."],
-      },
-      {
-        id: "nest-eth",
-        label: "eth",
-        type: "registry",
-        slots: ["owner: 0x0123..."],
-      },
-      {
-        id: "nest-workemon",
-        label: "workemon.eth",
-        type: "registry",
-        slots: ["owner: 0x0123..."],
-      },
-      {
-        id: "nest-wallet",
-        label: "wallet.workemon.eth",
-        type: "registry",
-        children: [
-          { id: "w-owner", label: "owner: 0x0123...", type: "label" },
-          { id: "w-res", label: "resolver: 0x6789...", type: "dashed" },
-        ],
-      },
-      {
-        id: "nest-delegate",
-        label: "delegate.workemon.eth",
-        type: "registry",
-        children: [
-          { id: "d-owner", label: "owner: 0x0123...", type: "label" },
-          { id: "d-res", label: "resolver: 0x6789...", type: "dashed" },
-        ],
-      },
-    ],
-  },
-  { id: "resolvers", label: "Resolvers", type: "dashed" },
-]
-
-const DEFAULT_EDGES: EdgeData[] = [{ from: "registry-root", to: "resolvers" }]
-
-const DEFAULT_MERMAID = serializeMermaid(DEFAULT_NODES, DEFAULT_EDGES)
+/** Initial editor: nested preset; bundled JSON children merge in `mergeNestedColumnDemoNodes`. */
+const DEFAULT_MERMAID = NESTED_COLUMN_MERMAID
 
 const MODES: DiagramMode[] = ["light", "dark", "protocol"]
+
+/** Drop the doc H1 so the panel doesn’t repeat the disclosure title. */
+function mermaidDocPanelBody(md: string): string {
+  return md.replace(/^#[^\n]*\n+/, "").trimStart()
+}
 
 export default function App() {
   const [mode, setMode] = useState<DiagramMode>("dark")
@@ -103,6 +65,16 @@ export default function App() {
     fontSize: [14, 8, 32],
     paddingH: [8, 0, 32],
     paddingV: [12, 0, 24],
+    /** Plain pill + hatched chips (Marist); colors default near dark-mode Figma; tweak per canvas. */
+    pillRadius: [12, 0, 32],
+    surfaceFill: { type: "color" as const, default: "#2a2a2a" },
+    surfaceBorder: { type: "color" as const, default: "#3d3d3d" },
+    surfaceBorderWidth: [1, 0, 3, 0.25],
+    textColor: { type: "color" as const, default: "#e1e1e0" },
+    letterSpacing: [0.05, 0, 0.2, 0.005],
+    hatchBase: { type: "color" as const, default: "#1c1c1c" },
+    hatchStripe1: { type: "color" as const, default: "#6a6a6a" },
+    hatchStripe2: { type: "color" as const, default: "#565656" },
   })
 
   const resolver = useDialKit("Resolver", {
@@ -140,11 +112,20 @@ export default function App() {
     {
       preset: {
         type: "select" as const,
-        options: ["draw", "fade", "pop", "none"],
-        default: "draw",
+        options: [...ANIMATION_PRESET_OPTIONS],
+        default: DEFAULT_ANIMATION_CONFIG.preset!,
       },
-      stagger: [0.08, 0, 0.4, 0.01],
-      spring: { type: "spring" as const, visualDuration: 0.4, bounce: 0.1 },
+      stagger: [
+        DEFAULT_ANIMATION_CONFIG.stagger!,
+        0,
+        0.4,
+        0.01,
+      ],
+      spring: DEFAULT_ANIMATION_CONFIG.spring as {
+        type: "spring"
+        visualDuration: number
+        bounce: number
+      },
       replay: { type: "action" as const, label: "Replay" },
     },
     {
@@ -156,13 +137,21 @@ export default function App() {
 
   const [mermaid, setMermaid] = useState(DEFAULT_MERMAID)
   const parsed = useMemo(() => parseMermaid(mermaid), [mermaid])
+  const diagramNodes = useMemo(
+    () => mergeNestedColumnDemoNodes(parsed.nodes, mermaid),
+    [parsed.nodes, mermaid]
+  )
 
   const embedSnippet = useMemo(() => buildDocsEmbedSnippet(mermaid, mode), [mermaid, mode])
 
+  /* Replay only when the animation preset changes — not on every DialKit tweak (stagger/spring). */
   useEffect(() => {
     replay()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: preset-only
   }, [animation.preset])
+
+  /** Dark canvas: Labels dials own pill/hatch hex (charcoal chip). Light/protocol keep Figma palette. */
+  const labelPaintFromDials = mode === "dark"
 
   const config: DiagramConfig = {
     mode,
@@ -173,21 +162,26 @@ export default function App() {
     nestedRegistryBorderRadius: nodes.borderRadius + 18,
     borderWidth: nodes.borderWidth,
     nodeColor: palette.nodeColor,
-    labelSurfaceFill: palette.labelSurfaceFill,
-    labelSurfaceBorder: palette.labelSurfaceBorder,
-    hatchBase: palette.hatchBase,
-    hatchStripe1: palette.hatchStripe1,
-    hatchStripe2: palette.hatchStripe2,
+    labelSurfaceFill: labelPaintFromDials ? labels.surfaceFill : palette.labelSurfaceFill,
+    labelSurfaceBorder: labelPaintFromDials
+      ? `${labels.surfaceBorderWidth}px solid ${labels.surfaceBorder}`
+      : palette.labelSurfaceBorder,
+    hatchBase: labelPaintFromDials ? labels.hatchBase : palette.hatchBase,
+    hatchStripe1: labelPaintFromDials ? labels.hatchStripe1 : palette.hatchStripe1,
+    hatchStripe2: labelPaintFromDials ? labels.hatchStripe2 : palette.hatchStripe2,
     labelFontSize: labels.fontSize,
     labelPaddingH: labels.paddingH,
     labelPaddingV: labels.paddingV,
-    labelColor: palette.labelColor,
+    labelColor: labelPaintFromDials ? labels.textColor : palette.labelColor,
+    labelBorderRadius: labels.pillRadius,
+    labelLetterSpacing: labels.letterSpacing,
     resolverFontSize: resolver.fontSize,
     resolverPaddingH: resolver.paddingH,
     resolverPaddingV: resolver.paddingV,
     resolverBorderRadius: resolver.borderRadius,
     resolverBorderWidth: resolver.borderWidth,
     resolverColor: palette.resolverColor,
+    resolverSurfaceFill: palette.resolverSurfaceFill,
     resolverSocketColor: palette.resolverSocketColor,
     resolverFrameInset: resolver.frameInset,
     resolverRadiusBonus: resolver.radiusBonus,
@@ -248,151 +242,125 @@ export default function App() {
         minHeight: "100vh",
         background: chrome.shellBg,
         display: "flex",
+        flexDirection: "column",
         alignItems: "stretch",
-        overflowX: "auto",
       }}
     >
-      <main
-        className="app-main"
+      <header
+        className="app-header"
         style={{
-          minWidth: 280,
-          flex: "1 1 auto",
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 40,
-          paddingRight: 24,
-          overflow: "auto",
-          ...mainBackground,
+          flex: "0 0 auto",
+          padding: "12px 20px",
+          borderBottom: chrome.asideBorder,
+          background: chrome.shellBg,
         }}
       >
-        <RegistryDiagram
-          ref={diagramRef}
-          key={key}
-          nodes={parsed.nodes}
-          edges={parsed.edges}
-          animation={animationConfig}
-          config={config}
-        />
-      </main>
-
-      <aside
-        className="app-aside"
-        style={{
-          width: 380,
-          flex: "0 0 380px",
-          height: "100vh",
-          maxHeight: "100vh",
-          overflowY: "auto",
-          overflowX: "hidden",
-          boxSizing: "border-box",
-          padding: 16,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "stretch",
-          gap: 12,
-          background: chrome.asideBg,
-          borderLeft: chrome.asideBorder,
-          boxShadow: chrome.asideShadow,
-        }}
-      >
-        <ModeSwitch mode={mode} onChange={setMode} chrome={chrome} />
-        <ReplayButton onClick={replay} chrome={chrome} />
-        <div
+        <h1
           style={{
-            width: "100%",
-            padding: 10,
-            borderRadius: 8,
-            border: chrome.panelBorder,
-            background: chrome.panelBg,
+            margin: 0,
+            fontFamily: "'ABC Monument Grotesk', ui-sans-serif, system-ui, sans-serif",
+            fontSize: 20,
+            fontWeight: 500,
+            lineHeight: 1.2,
+            color: chrome.text,
+            letterSpacing: "-0.02em",
           }}
         >
-          <p
-            style={{
-              margin: "0 0 8px 0",
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              color: chrome.textMuted,
-            }}
-          >
-            Diagonal stack
-          </p>
-          <DiagonalStack offsetX={8} offsetY={8}>
-            <div
-              style={{
-                width: 132,
-                height: 44,
-                boxSizing: "border-box",
-                borderRadius: 6,
-                border: `1px dashed ${chrome.textMuted}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontFamily: "ui-monospace, monospace",
-                fontSize: 12,
-                fontWeight: 600,
-                color: chrome.text,
-                background: chrome.mainBg,
-              }}
-            >
-              Resolvers
-            </div>
-            <div
-              style={{
-                width: 132,
-                height: 44,
-                boxSizing: "border-box",
-                borderRadius: 6,
-                border: `1px dashed ${chrome.textMuted}`,
-                background: "transparent",
-              }}
-            />
-            <div
-              style={{
-                width: 132,
-                height: 44,
-                boxSizing: "border-box",
-                borderRadius: 6,
-                border: `1px dashed ${chrome.textMuted}`,
-                background: "transparent",
-              }}
-            />
-          </DiagonalStack>
-        </div>
-        <ExportPanel
-          chrome={chrome}
-          exportScale={exportScale}
-          onScaleChange={setExportScale}
-          onExportPng={handleExportPng}
-        />
-        <EmbedPanel
-          chrome={chrome}
-          snippet={embedSnippet}
-          copied={embedCopied}
-          onCopy={handleCopyEmbed}
-        />
-        <div
-          className="sidebar-dialkit"
+          Ossë
+        </h1>
+      </header>
+
+      <div
+        className="app-shell-body"
+        style={{
+          flex: "1 1 auto",
+          display: "flex",
+          alignItems: "stretch",
+          minHeight: 0,
+          overflowX: "auto",
+        }}
+      >
+        <main
+          className="app-main"
           style={{
-            width: "100%",
-            flex: "0 0 auto",
+            minWidth: 280,
+            flex: "1 1 auto",
+            minHeight: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 40,
+            paddingRight: 24,
+            overflow: "auto",
+            ...mainBackground,
+          }}
+        >
+          <RegistryDiagram
+            ref={diagramRef}
+            key={key}
+            nodes={diagramNodes}
+            edges={parsed.edges}
+            animation={animationConfig}
+            config={config}
+          />
+        </main>
+
+        <aside
+          className="app-aside"
+          style={{
+            width: 380,
+            flex: "0 0 380px",
+            height: "auto",
+            maxHeight: "100vh",
+            overflowY: "auto",
+            overflowX: "hidden",
+            boxSizing: "border-box",
+            padding: 16,
             display: "flex",
             flexDirection: "column",
+            alignItems: "stretch",
             gap: 12,
+            background: chrome.asideBg,
+            borderLeft: chrome.asideBorder,
+            boxShadow: chrome.asideShadow,
           }}
         >
-          <DialRoot mode="inline" defaultOpen theme={chrome.dialKitTheme} />
-        </div>
-        <MermaidInput
-          value={mermaid}
-          onChange={setMermaid}
-          error={parsed.error}
-          chrome={chrome}
-        />
-      </aside>
+          <ModeSwitch mode={mode} onChange={setMode} chrome={chrome} />
+          <ReplayButton onClick={replay} chrome={chrome} />
+          <ExportPanel
+            chrome={chrome}
+            exportScale={exportScale}
+            onScaleChange={setExportScale}
+            onExportPng={handleExportPng}
+          />
+          <EmbedPanel
+            chrome={chrome}
+            snippet={embedSnippet}
+            copied={embedCopied}
+            onCopy={handleCopyEmbed}
+          />
+          <div
+            className="sidebar-dialkit"
+            style={{
+              width: "100%",
+              flex: "0 0 auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <DialRoot mode="inline" defaultOpen theme={chrome.dialKitTheme} />
+          </div>
+          <MermaidInput
+            value={mermaid}
+            onChange={setMermaid}
+            error={parsed.error}
+            chrome={chrome}
+            templates={MERMAID_TEMPLATES}
+            onReplay={replay}
+          />
+        </aside>
+      </div>
     </div>
   )
 }
@@ -669,9 +637,24 @@ interface MermaidInputProps {
   onChange: (next: string) => void
   error?: string
   chrome: (typeof APP_CHROME_BY_MODE)[DiagramMode]
+  templates: MermaidTemplate[]
+  onReplay?: () => void
 }
 
-function MermaidInput({ value, onChange, error, chrome }: MermaidInputProps) {
+function MermaidInput({
+  value,
+  onChange,
+  error,
+  chrome,
+  templates,
+  onReplay,
+}: MermaidInputProps) {
+  const matchedTemplateId = useMemo(() => findTemplateIdForSource(value) ?? "", [value])
+  const activeTemplate = useMemo(
+    () => templates.find((t) => t.id === matchedTemplateId),
+    [templates, matchedTemplateId]
+  )
+
   return (
     <div
       style={{
@@ -711,9 +694,94 @@ function MermaidInput({ value, onChange, error, chrome }: MermaidInputProps) {
             fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
           }}
         >
-          {error ? "parse error" : "[reg]  (plain)  ((hatched))  {dashed}"}
+          {error
+            ? "parse error"
+            : "[reg # frame=single]  (plain)  ((hatched))  {dashed # stack=N}"}
         </span>
       </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 12px",
+          borderBottom: chrome.panelBorder,
+          flexWrap: "wrap",
+        }}
+      >
+        <label
+          htmlFor="mermaid-template-select"
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: chrome.textMuted,
+            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+            flex: "0 0 auto",
+          }}
+        >
+          Template
+        </label>
+        <select
+          id="mermaid-template-select"
+          value={matchedTemplateId || "__none__"}
+          onChange={(e) => {
+            const id = e.target.value
+            if (id === "__none__") return
+            const t = templates.find((x) => x.id === id)
+            if (!t) return
+            onChange(t.source)
+            onReplay?.()
+          }}
+          aria-label="Load a Mermaid preset"
+          style={{
+            flex: "1 1 140px",
+            minWidth: 0,
+            padding: "6px 8px",
+            borderRadius: 6,
+            border: chrome.panelBorder,
+            background: "transparent",
+            color: chrome.text,
+            fontSize: 12,
+            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+            cursor: "pointer",
+          }}
+        >
+          <option value="__none__">— Current source (no preset) —</option>
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.title}
+            </option>
+          ))}
+        </select>
+        {activeTemplate?.thumbnailSrc ? (
+          <img
+            src={activeTemplate.thumbnailSrc}
+            alt={`${activeTemplate.title} reference`}
+            width={72}
+            height={48}
+            style={{
+              objectFit: "cover",
+              objectPosition: "center top",
+              borderRadius: 6,
+              border: chrome.panelBorder,
+              flex: "0 0 auto",
+            }}
+          />
+        ) : null}
+      </div>
+      {activeTemplate?.description ? (
+        <p
+          style={{
+            margin: 0,
+            padding: "0 12px 10px",
+            fontSize: 11,
+            lineHeight: 1.5,
+            color: chrome.textMuted,
+          }}
+        >
+          {activeTemplate.description}
+        </p>
+      ) : null}
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -757,7 +825,7 @@ function MermaidInput({ value, onChange, error, chrome }: MermaidInputProps) {
             userSelect: "none",
           }}
         >
-          Getting started with this editor
+          Mermaid syntax reference
         </summary>
         <div
           style={{
@@ -768,46 +836,30 @@ function MermaidInput({ value, onChange, error, chrome }: MermaidInputProps) {
           }}
         >
           <p style={{ margin: "0 0 10px" }}>
-            This panel is a small Mermaid-style flowchart: each line is a node or an edge. The
-            diagram updates as you type; invalid syntax shows a parse error in the header.
+            Live source:{" "}
+            <code style={{ color: chrome.text }}>docs/mermaid-patterns.md</code> (imported at build
+            time). Use the <strong style={{ color: chrome.text }}>Template</strong> dropdown for
+            presets. Invalid lines show a parse error in the header.
           </p>
-          <p style={{ margin: "0 0 8px", fontWeight: 600, color: chrome.text, fontSize: 11 }}>
-            Node shapes
-          </p>
-          <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
-            <li>
-              <code style={{ color: chrome.text }}>id[label]</code> — registry (optional{" "}
-              <code style={{ color: chrome.text }}>|slot1|slot2</code> for a hatched slot row)
-            </li>
-            <li>
-              <code style={{ color: chrome.text }}>id(label)</code> — label pill
-            </li>
-            <li>
-              <code style={{ color: chrome.text }}>id((label))</code> — hatched label
-            </li>
-            <li>
-              <code style={{ color: chrome.text }}>{"id{label}"}</code> — dashed resolver
-            </li>
-          </ul>
-          <p style={{ margin: "0 0 8px", fontWeight: 600, color: chrome.text, fontSize: 11 }}>
-            Edges & routing
-          </p>
-          <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
-            <li>
-              <code style={{ color: chrome.text }}>{"a --> b"}</code> — default orthogonal edge
-            </li>
-            <li>
-              Add{" "}
-              <code style={{ color: chrome.text }}># fromSlot=0 toSlot=1 route=vhv</code> on the
-              line to pin arrows to hatched slot ports or change the elbow style.
-            </li>
-          </ul>
-          <p style={{ margin: 0 }}>
-            <strong style={{ color: chrome.text }}>Nested registries</strong> (one frame with
-            child cards, as in the default diagram) are not expressible in this Mermaid subset —
-            define them in code as <code style={{ color: chrome.text }}>NodeData.children</code>,
-            or keep using the default source and adjust in the app bundle.
-          </p>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: chrome.textMuted,
+              margin: 0,
+              padding: "10px 10px 8px",
+              maxHeight: 380,
+              overflowY: "auto",
+              borderRadius: 8,
+              border: chrome.panelBorder,
+              background: "color-mix(in srgb, currentColor 6%, transparent)",
+            }}
+          >
+            {mermaidDocPanelBody(mermaidPatternsSource)}
+          </pre>
         </div>
       </details>
     </div>
