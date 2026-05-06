@@ -104,42 +104,32 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     ]
   )
 
-  const dsEmb = DIAGRAM_SYSTEM_EMBEDDED_RESOLVER
-  const nestedDashedProps = useMemo(
-    () => ({
+  const nestedDashedProps = useMemo(() => {
+    const e = DIAGRAM_SYSTEM_EMBEDDED_RESOLVER
+    return {
       /** Mono size aligned with sibling owner lines in nested registry (`labelFontSize`). */
       fontSize: labelFontSize,
-      paddingH: dsEmb.paddingH,
-      paddingV: dsEmb.paddingV,
-      borderRadius: dsEmb.borderRadius,
-      borderWidth: dsEmb.borderWidth,
+      paddingH: e.paddingH,
+      paddingV: e.paddingV,
+      borderRadius: e.borderRadius,
+      borderWidth: e.borderWidth,
       color: resolverColor,
       textColor: resolverLabelColor ?? resolverColor,
       surfaceFill: resolverSurfaceFill,
       socketColor: resolverSocketColor,
-      frameInset: dsEmb.frameInset,
-      radiusBonus: dsEmb.radiusBonus,
-      socketSize: dsEmb.socketSize,
-      dashLength: dsEmb.dashLength,
-      dashGap: dsEmb.dashGap,
-    }),
-    [
-      labelFontSize,
-      dsEmb.paddingH,
-      dsEmb.paddingV,
-      dsEmb.borderRadius,
-      dsEmb.borderWidth,
-      dsEmb.frameInset,
-      dsEmb.radiusBonus,
-      dsEmb.socketSize,
-      dsEmb.dashLength,
-      dsEmb.dashGap,
-      resolverColor,
-      resolverLabelColor,
-      resolverSurfaceFill,
-      resolverSocketColor,
-    ]
-  )
+      frameInset: e.frameInset,
+      radiusBonus: e.radiusBonus,
+      socketSize: e.socketSize,
+      dashLength: e.dashLength,
+      dashGap: e.dashGap,
+    }
+  }, [
+    labelFontSize,
+    resolverColor,
+    resolverLabelColor,
+    resolverSurfaceFill,
+    resolverSocketColor,
+  ])
 
   const layout = useMemo(
     () =>
