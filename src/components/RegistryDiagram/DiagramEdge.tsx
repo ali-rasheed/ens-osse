@@ -9,6 +9,7 @@ interface Props {
   strokeWidth?: number
   dotRadius?: number
   color?: string
+  arrowDelayOffset?: number
 }
 
 export function DiagramEdge({
@@ -18,10 +19,14 @@ export function DiagramEdge({
   strokeWidth = 1.5,
   dotRadius = 4,
   color = "#ffffff",
+  arrowDelayOffset = 0,
 }: Props) {
   if (edge.points.length < 2) return null
 
   const start = edge.points[0]
+  const end = edge.points[edge.points.length - 1]
+  const beforeEnd = edge.points[edge.points.length - 2]
+  const arrowhead = getArrowheadPath(beforeEnd, end)
 
   return (
     <g>
@@ -40,10 +45,43 @@ export function DiagramEdge({
         stroke={color}
         strokeWidth={strokeWidth}
         fill="none"
-        markerEnd="url(#arrowhead)"
+      />
+      <motion.path
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.01, delay: delay + arrowDelayOffset }}
+        d={arrowhead}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </g>
   )
+}
+
+function getArrowheadPath(
+  from: { x: number; y: number },
+  tip: { x: number; y: number }
+): string {
+  const dx = tip.x - from.x
+  const dy = tip.y - from.y
+  const length = Math.hypot(dx, dy) || 1
+  const ux = dx / length
+  const uy = dy / length
+  const px = -uy
+  const py = ux
+  const arrowLength = 4
+  const arrowSpread = 2.5
+  const baseX = tip.x - ux * arrowLength
+  const baseY = tip.y - uy * arrowLength
+  const leftX = baseX + px * arrowSpread
+  const leftY = baseY + py * arrowSpread
+  const rightX = baseX - px * arrowSpread
+  const rightY = baseY - py * arrowSpread
+
+  return `M ${leftX} ${leftY} L ${tip.x} ${tip.y} L ${rightX} ${rightY}`
 }
 
 interface ArrowheadDefProps {
@@ -51,19 +89,6 @@ interface ArrowheadDefProps {
   color?: string
 }
 
-export function ArrowheadDef({ strokeWidth = 1.5, color = "#ffffff" }: ArrowheadDefProps = {}) {
-  return (
-    <defs>
-      <marker
-        id="arrowhead"
-        markerWidth={8}
-        markerHeight={8}
-        refX={4}
-        refY={4}
-        orient="auto"
-      >
-        <path d="M 0 1.5 L 4 4 L 0 6.5" stroke={color} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      </marker>
-    </defs>
-  )
+export function ArrowheadDef(_props: ArrowheadDefProps = {}) {
+  return null
 }
