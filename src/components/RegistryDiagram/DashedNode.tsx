@@ -15,11 +15,15 @@ interface Props {
   borderRadius?: number
   borderWidth?: number
   color?: string
+  /** Corner sockets; defaults to `color` when omitted. */
+  socketColor?: string
   frameInset?: number
   radiusBonus?: number
   socketSize?: number
   dashLength?: number
   dashGap?: number
+  /** Nested in a registry column: no absolute canvas positioning. */
+  embedded?: boolean
 }
 
 export function DashedNode({
@@ -36,12 +40,15 @@ export function DashedNode({
   borderRadius = 6,
   borderWidth = 0.5,
   color = "#ffffff",
+  socketColor,
   frameInset = 10,
   radiusBonus = 8,
   socketSize = 12,
   dashLength = 6,
   dashGap = 5,
+  embedded = false,
 }: Props) {
+  const socketFill = socketColor ?? color
   const strokeInset = frameInset + borderWidth / 2
   const socketOffset = -socketSize / 2
   const socketMaxX = width - socketSize / 2
@@ -51,12 +58,13 @@ export function DashedNode({
       variants={variants}
       custom={delay}
       style={{
-        position: "absolute",
-        left: x,
-        top: y,
+        position: embedded ? "relative" : "absolute",
+        left: embedded ? undefined : x,
+        top: embedded ? undefined : y,
         width,
         height,
         transformOrigin: "0 0",
+        alignSelf: embedded ? "center" : undefined,
       }}
     >
       <svg
@@ -77,15 +85,15 @@ export function DashedNode({
           strokeDasharray={`${dashLength} ${dashGap}`}
           strokeLinecap="butt"
         />
-        <rect x={socketOffset} y={socketOffset} width={socketSize} height={socketSize} fill={color} />
-        <rect x={socketMaxX} y={socketOffset} width={socketSize} height={socketSize} fill={color} />
-        <rect x={socketOffset} y={socketMaxY} width={socketSize} height={socketSize} fill={color} />
+        <rect x={socketOffset} y={socketOffset} width={socketSize} height={socketSize} fill={socketFill} />
+        <rect x={socketMaxX} y={socketOffset} width={socketSize} height={socketSize} fill={socketFill} />
+        <rect x={socketOffset} y={socketMaxY} width={socketSize} height={socketSize} fill={socketFill} />
         <rect
           x={socketMaxX}
           y={socketMaxY}
           width={socketSize}
           height={socketSize}
-          fill={color}
+          fill={socketFill}
         />
       </svg>
       <div

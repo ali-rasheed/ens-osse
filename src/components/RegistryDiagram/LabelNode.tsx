@@ -28,6 +28,8 @@ interface Props {
   hatchBase?: string
   hatchStripe1?: string
   hatchStripe2?: string
+  /** Nested in a registry column: no absolute canvas positioning. */
+  embedded?: boolean
 }
 
 export function LabelNode({
@@ -48,15 +50,16 @@ export function LabelNode({
   hatchBase = "rgba(255, 255, 255, 0.04)",
   hatchStripe1 = "rgba(255,255,255,0.14)",
   hatchStripe2 = "rgba(255,255,255,0.12)",
+  embedded = false,
 }: Props) {
   return (
     <motion.div
       variants={variants}
       custom={delay}
       style={{
-        position: "absolute",
-        left: x,
-        top: y,
+        position: embedded ? "relative" : "absolute",
+        left: embedded ? undefined : x,
+        top: embedded ? undefined : y,
         width,
         height,
         display: "flex",

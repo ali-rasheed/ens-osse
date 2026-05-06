@@ -98,6 +98,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     paddingH = 16,
     paddingV = 10,
     borderRadius = 6,
+    nestedRegistryBorderRadius = 24,
     borderWidth = 1.5,
     nodeColor = "#ffffff",
     labelSurfaceFill,
@@ -115,6 +116,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     resolverBorderRadius = 6,
     resolverBorderWidth = 0.5,
     resolverColor = "#ffffff",
+    resolverSocketColor,
     resolverFrameInset = 10,
     resolverRadiusBonus = 8,
     resolverSocketSize = 12,
@@ -132,6 +134,72 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
   } = config
 
   const { preset = "draw", stagger = 0.08, spring, duration = 0.5 } = animation
+
+  const layoutMetrics = useMemo(
+    () => ({
+      fontSize,
+      paddingH,
+      paddingV,
+      borderWidth,
+      resolverFontSize,
+      resolverPaddingH,
+      resolverPaddingV,
+      resolverBorderWidth,
+      resolverSocketOverhang,
+      resolverMinWidth,
+      resolverMinHeight,
+      labelFontSize,
+      labelPaddingH,
+      labelPaddingV,
+    }),
+    [
+      fontSize,
+      paddingH,
+      paddingV,
+      borderWidth,
+      resolverFontSize,
+      resolverPaddingH,
+      resolverPaddingV,
+      resolverBorderWidth,
+      resolverSocketOverhang,
+      resolverMinWidth,
+      resolverMinHeight,
+      labelFontSize,
+      labelPaddingH,
+      labelPaddingV,
+    ]
+  )
+
+  const nestedDashedProps = useMemo(
+    () => ({
+      fontSize: resolverFontSize,
+      paddingH: resolverPaddingH,
+      paddingV: resolverPaddingV,
+      borderRadius: resolverBorderRadius,
+      borderWidth: resolverBorderWidth,
+      color: resolverColor,
+      socketColor: resolverSocketColor,
+      frameInset: resolverFrameInset,
+      radiusBonus: resolverRadiusBonus,
+      socketSize: resolverSocketSize,
+      dashLength: resolverDashLength,
+      dashGap: resolverDashGap,
+    }),
+    [
+      resolverFontSize,
+      resolverPaddingH,
+      resolverPaddingV,
+      resolverBorderRadius,
+      resolverBorderWidth,
+      resolverColor,
+      resolverSocketColor,
+      resolverFrameInset,
+      resolverRadiusBonus,
+      resolverSocketSize,
+      resolverDashLength,
+      resolverDashGap,
+    ]
+  )
 
   const layout = useMemo(
     () =>
@@ -266,6 +334,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
           borderRadius: resolverBorderRadius,
           borderWidth: resolverBorderWidth,
           color: resolverColor,
+          socketColor: resolverSocketColor,
           frameInset: resolverFrameInset,
           radiusBonus: resolverRadiusBonus,
           socketSize: resolverSocketSize,
@@ -287,7 +356,9 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
             <RegistryNode
               {...props}
               {...styled}
+              nestedBorderRadius={nestedRegistryBorderRadius}
               slots={node.slots}
+              children={node.children}
               slotFontSize={labelFontSize}
               slotPaddingH={labelPaddingH}
               slotPaddingV={labelPaddingV}
@@ -295,6 +366,10 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
               hatchBase={hatchBase}
               hatchStripe1={hatchStripe1}
               hatchStripe2={hatchStripe2}
+              layoutOptions={layoutMetrics}
+              nestedDashed={nestedDashedProps}
+              labelSurfaceFill={surface.surfaceFill}
+              labelSurfaceBorder={surface.surfaceBorder}
             />
           )
         if (node.type === "dashed") return <DashedNode {...props} {...resolverStyled} />

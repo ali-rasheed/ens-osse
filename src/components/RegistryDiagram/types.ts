@@ -9,6 +9,11 @@ export interface NodeData {
   type: NodeType
   /** `registry` only: inner hatched slot labels inside one compound frame (Figma Diagram System). */
   slots?: string[]
+  /**
+   * `registry` only: nested nodes drawn inside this frame (vertical stack; Figma nested Registry).
+   * When `children?.length` is set, `slots` is ignored for layout/render. Not represented in Mermaid v1.
+   */
+  children?: NodeData[]
 }
 
 /** Orthogonal routing between non–axis-aligned polyline joints from Dagre. */
@@ -17,9 +22,15 @@ export type EdgeOrthogonalStyle = "hv" | "vhv"
 export interface EdgeData {
   from: string
   to: string
-  /** When `from` is a compound `registry` with `slots`, attach the edge tail to this slot’s bottom-center. */
+  /**
+   * When `from` is a compound `registry` with a hatched `slots` row (no `children`), attach the edge
+   * tail to this slot’s bottom-center. Ignored for `registry` nodes that use `children` instead of `slots`.
+   */
   fromSlotIndex?: number
-  /** When `to` is a compound `registry` with `slots`, attach the edge head to this slot’s bottom-center. */
+  /**
+   * When `to` is a compound `registry` with a hatched `slots` row (no `children`), attach the edge
+   * head to this slot’s bottom-center. Ignored for `registry` nodes that use `children` instead of `slots`.
+   */
   toSlotIndex?: number
   /**
    * How to square off diagonal segments: `hv` = horizontal then vertical; `vhv` = vertical,
@@ -43,6 +54,8 @@ export interface DiagramConfig {
   paddingH?: number
   paddingV?: number
   borderRadius?: number
+  /** Extra rounding on registry cards nested inside a parent `registry` (Figma ~24px vs ~6px shell). */
+  nestedRegistryBorderRadius?: number
   borderWidth?: number
   nodeColor?: string
   /** Solid label pill fill (non-hatched). */
@@ -64,6 +77,8 @@ export interface DiagramConfig {
   resolverBorderRadius?: number
   resolverBorderWidth?: number
   resolverColor?: string
+  /** Corner square fills on dashed resolver (protocol: lapis/900 per Diagram System). */
+  resolverSocketColor?: string
   resolverFrameInset?: number
   resolverRadiusBonus?: number
   resolverSocketSize?: number

@@ -63,6 +63,10 @@ export interface ParsedGraph {
   error?: string
 }
 
+/**
+ * Nested `registry.children` trees are not expressible in this Mermaid subset; use the JSON
+ * `NodeData[]` shape in code when you need registries inside registries.
+ */
 export function parseMermaid(src: string): ParsedGraph {
   const nodeMap = new Map<string, NodeData>()
   const edges: EdgeData[] = []

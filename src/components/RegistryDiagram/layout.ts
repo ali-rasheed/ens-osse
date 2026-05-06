@@ -1,8 +1,9 @@
 /**
  * Dagre layout for registry / label / resolver nodes, plus deterministic sizing for
- * compound registry frames (header + hatched slots) and optional edge anchors
- * on slot bottom-centers (Figma Diagram System ports). Edge polylines are
- * orthogonalized to axis-aligned segments (90° only); `pointsToPath` fillets 90° bends
+ * compound registry frames (header + hatched slots or nested `children`), and optional
+ * edge anchors on hatched slot bottom-centers (Figma Diagram System ports). Nested
+ * registries use a single outer stroke + frame padding (no double outline). Edge polylines
+ * are orthogonalized to axis-aligned segments (90° only); `pointsToPath` fillets 90° bends
  * using the layout `cornerRadius` (quadratic beziers). Final approach legs are snapped to
  * the target node’s top/bottom center (vertical tail) or left/right center (horizontal tail)
  * so the arrow meets the frame on-axis (skipped when `toSlotIndex` pins the head to a slot).
@@ -20,8 +21,14 @@ import type {
 // Char-width ratios per font (px per character at 1px fontSize)
 const CHAR_RATIO = { registry: 0.6, dashed: 0.6, label: 0.5 }
 
-/** Gap between outer and inner registry outlines; keep in sync with `RegistryNode`. */
-export const REGISTRY_SHELL_GAP = 3
+/** Padding inside the registry stroke before header / body (Figma `p-[8px]`); keep in sync with `RegistryNode`. */
+export const REGISTRY_FRAME_PADDING = 8
+
+/** Vertical gap between stacked nested registry cards inside `children`. */
+export const REGISTRY_NESTED_CHILD_GAP = 16
+
+/** Vertical gap between mono lines when `slots` are stacked (nested registries). */
+export const REGISTRY_SLOT_TEXT_GAP = 8
 
 /** Vertical gap between mono header and slot row (Figma `gap-[12px]`). */
 export const REGISTRY_HEADER_SLOT_GAP = 12
@@ -44,19 +51,24 @@ interface BoxOptions {
   labelFontSize: number
   labelPaddingH: number
   labelPaddingV: number
+  /**
+   * When measuring nodes nested inside a parent registry’s `children`, registry `slots` are
+   * a vertical mono stack (not a hatched row).
+   */
+  insideRegistryChildrenTree?: boolean
 }
 
-/** Horizontal chrome from outer border → inner content (one side): b + shellGap + b. */
-function registrySideChrome(borderWidth: number): number {
-  return borderWidth + REGISTRY_SHELL_GAP + borderWidth
+/** One side: stroke + inner frame padding (content flex starts after this). */
+export function registryContentInset(borderWidth: number): number {
+  return borderWidth + REGISTRY_FRAME_PADDING
 }
 
-function registryShell(borderWidth: number): number {
-  return 2 * registrySideChrome(borderWidth)
+function registryFrameTotalBreadth(borderWidth: number): number {
+  return 2 * registryContentInset(borderWidth)
 }
 
 function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: number } {
-  const { type, label, slots } = node
+  const { type, label, slots, children } = node
   if (type === "label" || type === "labelHatched") {
     const w = label.length * CHAR_RATIO.label * opts.labelFontSize + opts.labelPaddingH * 2
     const h = opts.labelFontSize * 1.4 + opts.labelPaddingV * 2
@@ -76,13 +88,63 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
   }
 
   const minW = 56
-  const shell = registryShell(opts.borderWidth)
+  const frameBreadth = registryFrameTotalBreadth(opts.borderWidth)
+  const activeChildren =
+    type === "registry" && children?.filter(Boolean).length
+      ? children!.filter(Boolean)
+      : undefined
 
-  const activeSlots = type === "registry" && slots?.length ? slots : undefined
-  if (!activeSlots) {
+  if (activeChildren?.length) {
+    const nestedOpts: BoxOptions = { ...opts, insideRegistryChildrenTree: true }
+    let colW = 0
+    let colH = 0
+    for (let i = 0; i < activeChildren.length; i++) {
+      const b = nodeBox(activeChildren[i], nestedOpts)
+      colW = Math.max(colW, b.width)
+      colH += b.height
+      if (i < activeChildren.length - 1) colH += REGISTRY_NESTED_CHILD_GAP
+    }
+    const headerTextW = label.length * CHAR_RATIO.registry * opts.fontSize
+    const headerLineH = opts.fontSize * 1.4
+    const innerContentW = Math.max(headerTextW, colW) + opts.paddingH * 2
+    const innerContentH =
+      opts.paddingV + headerLineH + REGISTRY_HEADER_SLOT_GAP + colH + opts.paddingV
+    return {
+      width: Math.max(minW, innerContentW + frameBreadth),
+      height: innerContentH + frameBreadth,
+    }
+  }
+
+  const activeSlots = slots?.filter(Boolean) ?? []
+  const slotTextStack = activeSlots.length > 0 && Boolean(opts.insideRegistryChildrenTree)
+
+  if (slotTextStack) {
+    const headerTextW = label.length * CHAR_RATIO.registry * opts.fontSize
+    const headerLineH = opts.fontSize * 1.4
+    const lineH = opts.labelFontSize * 1.4
+    let maxSlotW = 0
+    for (const s of activeSlots) {
+      maxSlotW = Math.max(
+        maxSlotW,
+        s.length * CHAR_RATIO.registry * opts.labelFontSize + opts.labelPaddingH * 2
+      )
+    }
+    const innerContentW = Math.max(headerTextW, maxSlotW) + opts.paddingH * 2
+    const stackH =
+      activeSlots.length * lineH +
+      (activeSlots.length > 1 ? (activeSlots.length - 1) * REGISTRY_SLOT_TEXT_GAP : 0)
+    const innerContentH =
+      opts.paddingV + headerLineH + REGISTRY_HEADER_SLOT_GAP + stackH + opts.paddingV
+    return {
+      width: Math.max(minW, innerContentW + frameBreadth),
+      height: innerContentH + frameBreadth,
+    }
+  }
+
+  if (!activeSlots.length) {
     const w =
-      label.length * CHAR_RATIO.registry * opts.fontSize + opts.paddingH * 2 + shell
-    const h = opts.fontSize * 1.4 + opts.paddingV * 2 + shell
+      label.length * CHAR_RATIO.registry * opts.fontSize + opts.paddingH * 2 + frameBreadth
+    const h = opts.fontSize * 1.4 + opts.paddingV * 2 + frameBreadth
     return { width: Math.max(minW, w), height: h }
   }
 
@@ -106,14 +168,14 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
     slotRowH +
     opts.paddingV
 
-  const w = Math.max(minW, innerContentW + shell)
-  const h = innerContentH + shell
+  const w = Math.max(minW, innerContentW + frameBreadth)
+  const h = innerContentH + frameBreadth
   return { width: w, height: h }
 }
 
 const PADDING = 40
 
-interface LayoutOptions {
+export interface LayoutOptions {
   ranksep?: number
   nodesep?: number
   cornerRadius?: number
@@ -131,6 +193,54 @@ interface LayoutOptions {
   labelFontSize?: number
   labelPaddingH?: number
   labelPaddingV?: number
+}
+
+/** Builds dagre measurement options (shared by `computeLayout` and `layoutNodeDimensions`). */
+export function buildBoxOptions(options: LayoutOptions = {}): BoxOptions {
+  const {
+    fontSize = 16,
+    paddingH = 16,
+    paddingV = 10,
+    borderWidth = 1.5,
+    resolverFontSize = 16,
+    resolverPaddingH = 16,
+    resolverPaddingV = 10,
+    resolverBorderWidth = 0.5,
+    resolverSocketOverhang = 6,
+    resolverMinWidth = 291,
+    resolverMinHeight = 115,
+    labelFontSize = 14,
+    labelPaddingH = 8,
+    labelPaddingV = 4,
+  } = options
+  return {
+    fontSize,
+    paddingH,
+    paddingV,
+    borderWidth,
+    resolverFontSize,
+    resolverPaddingH,
+    resolverPaddingV,
+    resolverBorderWidth,
+    resolverSocketOverhang,
+    resolverMinWidth,
+    resolverMinHeight,
+    labelFontSize,
+    labelPaddingH,
+    labelPaddingV,
+  }
+}
+
+/** Measure a node’s width/height with the same rules as dagre (e.g. nested `children` inside a registry). */
+export function layoutNodeDimensions(
+  node: NodeData,
+  options: LayoutOptions & { insideRegistryChildrenTree?: boolean } = {}
+): { width: number; height: number } {
+  const { insideRegistryChildrenTree, ...rest } = options
+  return nodeBox(node, {
+    ...buildBoxOptions(rest),
+    insideRegistryChildrenTree,
+  })
 }
 
 const ORTH_EPS = 0.5
@@ -317,10 +427,10 @@ export function compoundRegistrySlotBottomCenters(
   opts: BoxOptions
 ): { x: number; y: number }[] {
   const slots = node.type === "registry" ? node.slots?.filter(Boolean) : undefined
-  if (!slots?.length) return []
+  if (!slots?.length || node.children?.length) return []
 
   const b = opts.borderWidth
-  const side = registrySideChrome(b)
+  const side = registryContentInset(b)
   const innerContentW = pos.width - 2 * side
   const cellWs = slotCellWidths(slots, opts)
   let slotRowInnerW = 0
@@ -367,7 +477,7 @@ function applySlotAnchors(
 
   function anchorsFor(id: string): { x: number; y: number }[] {
     const n = byId.get(id)
-    if (!n || n.type !== "registry" || !n.slots?.length) return []
+    if (!n || n.type !== "registry" || n.children?.length || !n.slots?.length) return []
     if (!anchorCache.has(id)) {
       anchorCache.set(id, compoundRegistrySlotBottomCenters(n, n, opts))
     }
@@ -402,41 +512,8 @@ export function computeLayout(
   edges: EdgeData[],
   options: LayoutOptions = {}
 ): LayoutResult {
-  const {
-    ranksep = 70,
-    nodesep = 50,
-    cornerRadius = 10,
-    fontSize = 16,
-    paddingH = 16,
-    paddingV = 10,
-    borderWidth = 1.5,
-    resolverFontSize = 16,
-    resolverPaddingH = 16,
-    resolverPaddingV = 10,
-    resolverBorderWidth = 0.5,
-    resolverSocketOverhang = 6,
-    resolverMinWidth = 291,
-    resolverMinHeight = 115,
-    labelFontSize = 14,
-    labelPaddingH = 8,
-    labelPaddingV = 4,
-  } = options
-  const boxOpts: BoxOptions = {
-    fontSize,
-    paddingH,
-    paddingV,
-    borderWidth,
-    resolverFontSize,
-    resolverPaddingH,
-    resolverPaddingV,
-    resolverBorderWidth,
-    resolverSocketOverhang,
-    resolverMinWidth,
-    resolverMinHeight,
-    labelFontSize,
-    labelPaddingH,
-    labelPaddingV,
-  }
+  const { ranksep = 70, nodesep = 50, cornerRadius = 10, ...layoutRest } = options
+  const boxOpts = buildBoxOptions(layoutRest)
   const g = new dagre.graphlib.Graph()
   g.setGraph({
     rankdir: "TB",
