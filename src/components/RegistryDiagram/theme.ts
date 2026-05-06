@@ -1,6 +1,10 @@
 /**
  * ENS Core + Diagram System Figma variables → app modes.
  * Tokens: lapis/* and quartz/* from design files; modes map shell + diagram surfaces.
+ *
+ * Protocol / “blueprint” canvas reference (grid, lapis/100 field, 2px lapis/500 strokes,
+ * lapis/900 resolver corner squares, plain labels without pill chrome):
+ * https://www.figma.com/design/BYUUCeRHgEgzbLZrGmxXHE/Diagram-System?node-id=76-623
  */
 export const ENS_TOKENS = {
   "lapis/100": "#dbf0f8",
@@ -37,6 +41,8 @@ export interface DiagramPalette {
   nodeColor: string
   labelColor: string
   resolverColor: string
+  /** Filled corner sockets on dashed resolver frame (Diagram System: lapis/900 in protocol). */
+  resolverSocketColor: string
   edgeColor: string
   labelSurfaceFill: string
   labelSurfaceBorder: string
@@ -95,6 +101,7 @@ export const DIAGRAM_PALETTE_BY_MODE: Record<DiagramMode, DiagramPalette> = {
     nodeColor: T["quartz/900"],
     labelColor: T["quartz/900"],
     resolverColor: T["quartz/900"],
+    resolverSocketColor: T["quartz/900"],
     edgeColor: T["quartz/500"],
     labelSurfaceFill: `color-mix(in srgb, ${T["quartz/500"]} 12%, ${T["quartz/0"]})`,
     labelSurfaceBorder: `1px solid color-mix(in srgb, ${T["quartz/500"]} 35%, transparent)`,
@@ -106,6 +113,7 @@ export const DIAGRAM_PALETTE_BY_MODE: Record<DiagramMode, DiagramPalette> = {
     nodeColor: T["quartz/0"],
     labelColor: T["quartz/100"],
     resolverColor: T["quartz/0"],
+    resolverSocketColor: T["quartz/0"],
     edgeColor: T["quartz/0"],
     labelSurfaceFill: "rgba(255, 255, 255, 0.06)",
     labelSurfaceBorder: "1px solid rgba(255, 255, 255, 0.08)",
@@ -117,21 +125,24 @@ export const DIAGRAM_PALETTE_BY_MODE: Record<DiagramMode, DiagramPalette> = {
     nodeColor: T["lapis/500"],
     labelColor: T["lapis/500"],
     resolverColor: T["lapis/500"],
-    edgeColor: T["lapis/900"],
-    labelSurfaceFill: `color-mix(in srgb, ${T["lapis/500"]} 12%, ${T["lapis/100"]})`,
-    labelSurfaceBorder: `1px solid color-mix(in srgb, ${T["lapis/500"]} 40%, transparent)`,
-    hatchBase: `color-mix(in srgb, ${T["lapis/900"]} 10%, ${T["lapis/100"]})`,
-    hatchStripe1: `color-mix(in srgb, ${T["lapis/900"]} 35%, transparent)`,
-    hatchStripe2: `color-mix(in srgb, ${T["lapis/500"]} 30%, transparent)`,
+    resolverSocketColor: T["lapis/900"],
+    /** Connectors, dots, and arrowheads match stroke blue in Diagram System. */
+    edgeColor: T["lapis/500"],
+    /** Plain edge labels: text only on lapis/100 (no pill). */
+    labelSurfaceFill: "transparent",
+    labelSurfaceBorder: "none",
+    hatchBase: `color-mix(in srgb, ${T["lapis/900"]} 8%, ${T["lapis/100"]})`,
+    hatchStripe1: `color-mix(in srgb, ${T["lapis/500"]} 28%, transparent)`,
+    hatchStripe2: `color-mix(in srgb, ${T["lapis/900"]} 22%, transparent)`,
   },
 }
 
 /**
- * Lapis grid-lined canvas (Diagram System): light grid on lapis/100.
+ * Lapis grid-lined canvas (Diagram System node 76:623): blueprint field on lapis/100.
  */
 export function protocolMainBackground(): string {
   const bg = T["lapis/100"]
-  const line = `color-mix(in srgb, ${T["lapis/500"]} 18%, transparent)`
+  const line = `color-mix(in srgb, ${T["lapis/500"]} 22%, transparent)`
   const grid = [
     `linear-gradient(${line} 1px, transparent 1px)`,
     `linear-gradient(90deg, ${line} 1px, transparent 1px)`,
