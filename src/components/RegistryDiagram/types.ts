@@ -92,6 +92,8 @@ export interface DiagramConfig {
   labelBorderRadius?: number
   /** Letter-spacing on Marist label text, in em. */
   labelLetterSpacing?: number
+  /** Registry primary title (`eth`, `<root>`): tracking in em (slots keep `labelLetterSpacing`). */
+  primaryLetterSpacing?: number
   resolverFontSize?: number
   resolverPaddingH?: number
   resolverPaddingV?: number

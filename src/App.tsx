@@ -45,6 +45,26 @@ function mermaidDocPanelBody(md: string): string {
   return md.replace(/^#[^\n]*\n+/, "").trimStart()
 }
 
+/**
+ * DialKit numeric parameters as `<select>` dropdowns (resolved values are strings).
+ * Use `Number(...)` when wiring into `DiagramConfig` / `AnimationConfig`.
+ */
+function dialNumSelect(
+  defaultVal: number,
+  choices: readonly number[],
+  formatLabel: (n: number) => string = (n) => String(n)
+): { type: "select"; options: { value: string; label: string }[]; default: string } {
+  return {
+    type: "select" as const,
+    options: choices.map((n) => ({ value: String(n), label: formatLabel(n) })),
+    default: String(defaultVal),
+  }
+}
+
+function dialPxSelect(defaultVal: number, choices: readonly number[]) {
+  return dialNumSelect(defaultVal, choices, (n) => `${n}px`)
+}
+
 export default function App() {
   const [mode, setMode] = useState<DiagramMode>("dark")
   const [exportScale, setExportScale] = useState<ExportScale>(2)
@@ -54,55 +74,77 @@ export default function App() {
   const chrome = APP_CHROME_BY_MODE[mode]
   const palette = DIAGRAM_PALETTE_BY_MODE[mode]
 
-  const nodes = useDialKit("Nodes", {
-    fontSize: [16, 8, 40],
-    paddingH: [16, 4, 48],
-    paddingV: [10, 4, 32],
-    borderRadius: [6, 0, 24],
-    borderWidth: [0.5, 0.5, 4, 0.5],
+  /**
+   * Nested DialKit folders map to registry frame UI: primary title (`eth`), double-outline shell,
+   * and owner / slot line (`owner: 0x…`) — same knobs drive layout (`computeLayout`).
+   */
+  const registryCards = useDialKit("Registry cards", {
+    primary: {
+      fontSize: dialPxSelect(16, [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40]),
+      /** Stroke + primary title on dark canvas; light/protocol still use palette for contrast. */
+      color: { type: "color" as const, default: "#ffffff" },
+      letterSpacing: dialNumSelect(
+        0.05,
+        [0, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.12, 0.15, 0.2],
+        (n) => `${n}em`
+      ),
+    },
+    frame: {
+      paddingH: dialPxSelect(16, [4, 8, 12, 16, 20, 24, 32, 40, 48]),
+      paddingV: dialPxSelect(10, [4, 6, 8, 10, 12, 16, 20, 24, 28, 32]),
+      borderRadius: dialPxSelect(6, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24]),
+      nestedBorderRadius: dialPxSelect(24, [0, 6, 12, 18, 24, 30, 36, 42, 48]),
+      borderWidth: dialNumSelect(0.5, [0.5, 1, 1.5, 2, 2.5, 3, 4], (n) => `${n}px`),
+    },
+    owner: {
+      fontSize: dialPxSelect(14, [8, 10, 12, 14, 16, 18, 20, 24, 28, 32]),
+      paddingH: dialPxSelect(22, [0, 8, 12, 16, 22, 24, 32, 40, 48]),
+      paddingV: dialPxSelect(5, [0, 4, 5, 8, 10, 12, 16, 20, 24, 28, 32]),
+      pillRadius: dialPxSelect(2, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32]),
+      textColor: { type: "color" as const, default: "#e1e1e0" },
+      letterSpacing: dialNumSelect(
+        0.05,
+        [0, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.12, 0.15, 0.2],
+        (n) => `${n}em`
+      ),
+    },
   })
 
-  const labels = useDialKit("Labels", {
-    fontSize: [14, 8, 32],
-    paddingH: [8, 0, 32],
-    paddingV: [12, 0, 24],
-    /** Plain pill + hatched chips (Marist); colors default near dark-mode Figma; tweak per canvas. */
-    pillRadius: [12, 0, 32],
+  const labels = useDialKit("Labels (pills)", {
+    /** Pill chrome + hatch only; typography for registry slots lives under Registry cards → owner. */
     surfaceFill: { type: "color" as const, default: "#2a2a2a" },
     surfaceBorder: { type: "color" as const, default: "#3d3d3d" },
-    surfaceBorderWidth: [1, 0, 3, 0.25],
-    textColor: { type: "color" as const, default: "#e1e1e0" },
-    letterSpacing: [0.05, 0, 0.2, 0.005],
+    surfaceBorderWidth: dialNumSelect(1, [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3], (n) => `${n}px`),
     hatchBase: { type: "color" as const, default: "#1c1c1c" },
     hatchStripe1: { type: "color" as const, default: "#6a6a6a" },
     hatchStripe2: { type: "color" as const, default: "#565656" },
   })
 
   const resolver = useDialKit("Resolver", {
-    fontSize: [17, 8, 40],
-    paddingH: [30, 0, 120],
-    paddingV: [15, 0, 80],
-    borderRadius: [19, 0, 40],
-    borderWidth: [0.5, 0.5, 4, 0.5],
-    frameInset: [0, 0, 40],
-    radiusBonus: [0, 0, 32],
-    socketSize: [4, 0, 32],
-    socketOverhang: [0, 0, 20],
-    minWidth: [140, 120, 600],
-    minHeight: [50, 48, 300],
-    dashLength: [5, 1, 32],
-    dashGap: [6, 1, 32],
+    fontSize: dialPxSelect(17, [8, 10, 12, 14, 16, 17, 18, 20, 24, 28, 32, 36, 40]),
+    paddingH: dialPxSelect(30, [0, 8, 16, 24, 30, 40, 48, 64, 80, 96, 120]),
+    paddingV: dialPxSelect(15, [0, 8, 10, 12, 15, 20, 24, 32, 40, 48, 64, 80]),
+    borderRadius: dialPxSelect(19, [0, 4, 8, 12, 16, 19, 24, 28, 32, 40]),
+    borderWidth: dialNumSelect(0.5, [0.5, 1, 1.5, 2, 2.5, 3, 4], (n) => `${n}px`),
+    frameInset: dialPxSelect(0, [0, 4, 8, 10, 12, 16, 20, 24, 32, 40]),
+    radiusBonus: dialPxSelect(0, [0, 4, 8, 12, 16, 20, 24, 32]),
+    socketSize: dialPxSelect(4, [0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 32]),
+    socketOverhang: dialPxSelect(0, [0, 4, 6, 8, 10, 12, 16, 20]),
+    minWidth: dialPxSelect(140, [120, 140, 160, 200, 240, 291, 320, 400, 480, 600]),
+    minHeight: dialPxSelect(50, [48, 50, 64, 80, 96, 115, 140, 180, 240, 300]),
+    dashLength: dialPxSelect(5, [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24, 32]),
+    dashGap: dialPxSelect(6, [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24, 32]),
   })
 
   const edges = useDialKit("Edges", {
-    strokeWidth: [1, 0.5, 4, 0.5],
-    cornerRadius: [17, 0, 48],
-    dotRadius: [3.5, 1, 10, 0.5],
+    strokeWidth: dialNumSelect(1, [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4], (n) => `${n}px`),
+    cornerRadius: dialPxSelect(17, [0, 4, 8, 12, 16, 17, 20, 24, 32, 40, 48]),
+    dotRadius: dialNumSelect(3.5, [1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8, 10], (n) => `${n}px`),
   })
 
   const layout = useDialKit("Layout", {
-    ranksep: [70, 20, 200],
-    nodesep: [50, 10, 150],
+    ranksep: dialPxSelect(70, [20, 32, 40, 50, 60, 70, 80, 96, 120, 160, 200]),
+    nodesep: dialPxSelect(50, [10, 20, 32, 40, 50, 60, 80, 100, 120, 150]),
   })
 
   const [key, setKey] = useState(0)
@@ -116,12 +158,9 @@ export default function App() {
         options: [...ANIMATION_PRESET_OPTIONS],
         default: DEFAULT_ANIMATION_CONFIG.preset!,
       },
-      stagger: [
-        DEFAULT_ANIMATION_CONFIG.stagger!,
-        0,
-        0.4,
-        0.01,
-      ],
+      stagger: dialNumSelect(DEFAULT_ANIMATION_CONFIG.stagger!, [
+        0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12, 0.16, 0.2, 0.24, 0.32, 0.4,
+      ], (n) => `${n}s`),
       spring: DEFAULT_ANIMATION_CONFIG.spring as {
         type: "spring"
         visualDuration: number
@@ -156,53 +195,54 @@ export default function App() {
 
   const config: DiagramConfig = {
     mode,
-    fontSize: nodes.fontSize,
-    paddingH: nodes.paddingH,
-    paddingV: nodes.paddingV,
-    borderRadius: nodes.borderRadius,
-    nestedRegistryBorderRadius: nodes.borderRadius + 18,
-    borderWidth: nodes.borderWidth,
-    nodeColor: palette.nodeColor,
+    fontSize: Number(registryCards.primary.fontSize),
+    paddingH: Number(registryCards.frame.paddingH),
+    paddingV: Number(registryCards.frame.paddingV),
+    borderRadius: Number(registryCards.frame.borderRadius),
+    nestedRegistryBorderRadius: Number(registryCards.frame.nestedBorderRadius),
+    borderWidth: Number(registryCards.frame.borderWidth),
+    nodeColor: mode === "dark" ? registryCards.primary.color : palette.nodeColor,
+    primaryLetterSpacing: Number(registryCards.primary.letterSpacing),
     labelSurfaceFill: labelPaintFromDials ? labels.surfaceFill : palette.labelSurfaceFill,
     labelSurfaceBorder: labelPaintFromDials
-      ? `${labels.surfaceBorderWidth}px solid ${labels.surfaceBorder}`
+      ? `${Number(labels.surfaceBorderWidth)}px solid ${labels.surfaceBorder}`
       : palette.labelSurfaceBorder,
     hatchBase: labelPaintFromDials ? labels.hatchBase : palette.hatchBase,
     hatchStripe1: labelPaintFromDials ? labels.hatchStripe1 : palette.hatchStripe1,
     hatchStripe2: labelPaintFromDials ? labels.hatchStripe2 : palette.hatchStripe2,
-    labelFontSize: labels.fontSize,
-    labelPaddingH: labels.paddingH,
-    labelPaddingV: labels.paddingV,
-    labelColor: labelPaintFromDials ? labels.textColor : palette.labelColor,
-    labelBorderRadius: labels.pillRadius,
-    labelLetterSpacing: labels.letterSpacing,
-    resolverFontSize: resolver.fontSize,
-    resolverPaddingH: resolver.paddingH,
-    resolverPaddingV: resolver.paddingV,
-    resolverBorderRadius: resolver.borderRadius,
-    resolverBorderWidth: resolver.borderWidth,
+    labelFontSize: Number(registryCards.owner.fontSize),
+    labelPaddingH: Number(registryCards.owner.paddingH),
+    labelPaddingV: Number(registryCards.owner.paddingV),
+    labelColor: labelPaintFromDials ? registryCards.owner.textColor : palette.labelColor,
+    labelBorderRadius: Number(registryCards.owner.pillRadius),
+    labelLetterSpacing: Number(registryCards.owner.letterSpacing),
+    resolverFontSize: Number(resolver.fontSize),
+    resolverPaddingH: Number(resolver.paddingH),
+    resolverPaddingV: Number(resolver.paddingV),
+    resolverBorderRadius: Number(resolver.borderRadius),
+    resolverBorderWidth: Number(resolver.borderWidth),
     resolverColor: palette.resolverColor,
     resolverSurfaceFill: palette.resolverSurfaceFill,
     resolverSocketColor: palette.resolverSocketColor,
-    resolverFrameInset: resolver.frameInset,
-    resolverRadiusBonus: resolver.radiusBonus,
-    resolverSocketSize: resolver.socketSize,
-    resolverSocketOverhang: resolver.socketOverhang,
-    resolverMinWidth: resolver.minWidth,
-    resolverMinHeight: resolver.minHeight,
-    resolverDashLength: resolver.dashLength,
-    resolverDashGap: resolver.dashGap,
-    strokeWidth: edges.strokeWidth,
-    cornerRadius: edges.cornerRadius,
-    dotRadius: edges.dotRadius,
+    resolverFrameInset: Number(resolver.frameInset),
+    resolverRadiusBonus: Number(resolver.radiusBonus),
+    resolverSocketSize: Number(resolver.socketSize),
+    resolverSocketOverhang: Number(resolver.socketOverhang),
+    resolverMinWidth: Number(resolver.minWidth),
+    resolverMinHeight: Number(resolver.minHeight),
+    resolverDashLength: Number(resolver.dashLength),
+    resolverDashGap: Number(resolver.dashGap),
+    strokeWidth: Number(edges.strokeWidth),
+    cornerRadius: Number(edges.cornerRadius),
+    dotRadius: Number(edges.dotRadius),
     edgeColor: palette.edgeColor,
-    ranksep: layout.ranksep,
-    nodesep: layout.nodesep,
+    ranksep: Number(layout.ranksep),
+    nodesep: Number(layout.nodesep),
   }
 
   const animationConfig: AnimationConfig = {
     preset: animation.preset as AnimationConfig["preset"],
-    stagger: animation.stagger,
+    stagger: Number(animation.stagger),
     spring: animation.spring,
   }
 

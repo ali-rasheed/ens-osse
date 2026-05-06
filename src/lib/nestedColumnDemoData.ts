@@ -19,7 +19,6 @@ export const NESTED_COLUMN_REGISTRY_ROOT: NodeData = {
       label: "<root>",
       type: "registry",
       registryFrame: "single",
-      slotsFont: "semimono",
       slots: ["owner: 0x0123..."],
     },
     {
@@ -27,7 +26,6 @@ export const NESTED_COLUMN_REGISTRY_ROOT: NodeData = {
       label: "eth",
       type: "registry",
       registryFrame: "single",
-      slotsFont: "semimono",
       slots: ["owner: 0x0123..."],
     },
     {
@@ -35,7 +33,6 @@ export const NESTED_COLUMN_REGISTRY_ROOT: NodeData = {
       label: "workemon.eth",
       type: "registry",
       registryFrame: "single",
-      slotsFont: "semimono",
       slots: ["owner: 0x0123..."],
     },
     {
@@ -44,7 +41,7 @@ export const NESTED_COLUMN_REGISTRY_ROOT: NodeData = {
       type: "registry",
       registryFrame: "single",
       children: [
-        { id: "w-owner", label: "owner: 0x0123...", type: "label", labelFont: "semimono" },
+        { id: "w-owner", label: "owner: 0x0123...", type: "label" },
         { id: "w-res", label: "resolver: 0x6789...", type: "dashed" },
       ],
     },
@@ -54,7 +51,7 @@ export const NESTED_COLUMN_REGISTRY_ROOT: NodeData = {
       type: "registry",
       registryFrame: "single",
       children: [
-        { id: "d-owner", label: "owner: 0x0123...", type: "label", labelFont: "semimono" },
+        { id: "d-owner", label: "owner: 0x0123...", type: "label" },
         { id: "d-res", label: "resolver: 0x6789...", type: "dashed" },
       ],
     },

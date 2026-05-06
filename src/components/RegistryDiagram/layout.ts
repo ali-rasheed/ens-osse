@@ -43,27 +43,6 @@ export const REGISTRY_HEADER_SLOT_GAP = 12
 /** Horizontal gap between hatched slot cells. */
 export const REGISTRY_SLOT_CELL_GAP = 8
 
-/**
- * Diagram System **Resolver** inner dashed frame (Figma `78:806` / compound inner `81:37061`).
- * Used only when measuring and rendering `type: "dashed"` nodes inside a registry `children`
- * column (`insideRegistryChildrenTree`). Top-level canvas resolvers still use DialKit defaults.
- */
-export const DIAGRAM_SYSTEM_EMBEDDED_RESOLVER = {
-  borderWidth: 2,
-  borderRadius: 4,
-  radiusBonus: 0,
-  socketSize: 8,
-  /** Half socket extent past stroke box so layout width/height matches corner chips. */
-  socketOverhang: 4,
-  paddingH: 28,
-  paddingV: 20,
-  frameInset: 0,
-  minWidth: 291,
-  minHeight: 115,
-  dashLength: 8,
-  dashGap: 5,
-} as const
-
 interface BoxOptions {
   fontSize: number
   paddingH: number
@@ -127,20 +106,14 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
     return { width: Math.max(32, w), height: h }
   }
   if (type === "dashed") {
-    const emb = opts.insideRegistryChildrenTree
-    const ds = DIAGRAM_SYSTEM_EMBEDDED_RESOLVER
-    const fs = emb ? opts.labelFontSize : opts.resolverFontSize
-    const padH = emb ? ds.paddingH : opts.resolverPaddingH
-    const padV = emb ? ds.paddingV : opts.resolverPaddingV
-    const bw = emb ? ds.borderWidth : opts.resolverBorderWidth
-    const oh = emb ? ds.socketOverhang : opts.resolverSocketOverhang
-    const minW = emb ? ds.minWidth : opts.resolverMinWidth
-    const minH = emb ? ds.minHeight : opts.resolverMinHeight
-    const shell = 2 * (bw + oh)
-    const w = label.length * CHAR_RATIO.dashed * fs + padH * 2 + shell
-    const h = fs * 1.4 + padV * 2 + shell
-    const baseW = Math.max(minW, w)
-    const baseH = Math.max(minH, h)
+    const shell = 2 * (opts.resolverBorderWidth + opts.resolverSocketOverhang)
+    const w =
+      label.length * CHAR_RATIO.dashed * opts.resolverFontSize +
+      opts.resolverPaddingH * 2 +
+      shell
+    const h = opts.resolverFontSize * 1.4 + opts.resolverPaddingV * 2 + shell
+    const baseW = Math.max(opts.resolverMinWidth, w)
+    const baseH = Math.max(opts.resolverMinHeight, h)
     const depth = Math.max(1, node.stackDepth ?? 1)
     const pad = (depth - 1) * RESOLVER_STACK_LAYER_OFFSET
     return {

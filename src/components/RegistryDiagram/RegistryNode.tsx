@@ -30,10 +30,7 @@ export interface NestedDashedNodeProps {
   paddingV: number
   borderRadius: number
   borderWidth: number
-  /** Dashed stroke + socket outline color (Diagram System). */
   color: string
-  /** Center label; defaults to `color` when omitted. */
-  textColor?: string
   surfaceFill?: string
   socketColor?: string
   frameInset: number
@@ -78,6 +75,8 @@ interface Props {
   labelBorderRadius?: number
   /** Marist tracking in em for slot row + nested labels. */
   labelLetterSpacing?: number
+  /** Semi-mono primary line tracking in em (registry title). */
+  primaryLetterSpacing?: number
   /** Hatched slot row + nested `slots` stack: Marist (records) vs Semi-Mono (roles / wallets). */
   slotsFont?: DiagramTypography
   /** Omit or unset for double border (default); `"single"` for one stroke + frame padding. */
@@ -144,6 +143,7 @@ export function RegistryNode({
   labelSurfaceBorder,
   labelBorderRadius = 12,
   labelLetterSpacing = 0.05,
+  primaryLetterSpacing = 0.05,
   slotsFont = "marist",
   registryFrame,
 }: Props) {
@@ -193,7 +193,7 @@ export function RegistryNode({
           fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
           fontWeight: 500,
           fontSize,
-          letterSpacing: "0.05em",
+          letterSpacing: `${primaryLetterSpacing}em`,
           color,
           whiteSpace: "nowrap",
           lineHeight: 1.4,
@@ -242,6 +242,7 @@ export function RegistryNode({
                 labelSurfaceBorder,
                 labelBorderRadius,
                 labelLetterSpacing,
+                primaryLetterSpacing,
               }}
             />
           ))}
@@ -444,6 +445,7 @@ interface NestedDiagramNodeProps {
     | "labelSurfaceBorder"
     | "labelBorderRadius"
     | "labelLetterSpacing"
+    | "primaryLetterSpacing"
   >
 }
 
@@ -486,6 +488,7 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
         hatchStripe2={registryProps.hatchStripe2}
         labelBorderRadius={registryProps.labelBorderRadius}
         labelLetterSpacing={registryProps.labelLetterSpacing}
+        primaryLetterSpacing={registryProps.primaryLetterSpacing}
         slotsFont={node.slotsFont ?? "marist"}
         registryFrame={node.registryFrame}
       />
@@ -512,7 +515,6 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
         borderRadius={d.borderRadius}
         borderWidth={d.borderWidth}
         color={d.color}
-        labelColor={d.textColor ?? d.color}
         socketColor={d.socketColor}
         frameInset={d.frameInset}
         radiusBonus={d.radiusBonus}

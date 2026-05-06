@@ -6,7 +6,7 @@ import {
   getArrowheadDelayOffset,
   resolveAnimationConfig,
 } from "./animationConfig"
-import { computeLayout, DIAGRAM_SYSTEM_EMBEDDED_RESOLVER } from "./layout"
+import { computeLayout } from "./layout"
 import { RegistryNode } from "./RegistryNode"
 import { LabelNode } from "./LabelNode"
 import { DashedNode } from "./DashedNode"
@@ -42,6 +42,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     labelColor = "#cfcfcf",
     labelBorderRadius = 12,
     labelLetterSpacing = 0.05,
+    primaryLetterSpacing = 0.05,
     resolverFontSize = 16,
     resolverPaddingH = 16,
     resolverPaddingV = 10,
@@ -104,32 +105,40 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     ]
   )
 
-  const nestedDashedProps = useMemo(() => {
-    const e = DIAGRAM_SYSTEM_EMBEDDED_RESOLVER
-    return {
-      /** Mono size aligned with sibling owner lines in nested registry (`labelFontSize`). */
-      fontSize: labelFontSize,
-      paddingH: e.paddingH,
-      paddingV: e.paddingV,
-      borderRadius: e.borderRadius,
-      borderWidth: e.borderWidth,
+  const nestedDashedProps = useMemo(
+    () => ({
+      fontSize: resolverFontSize,
+      paddingH: resolverPaddingH,
+      paddingV: resolverPaddingV,
+      borderRadius: resolverBorderRadius,
+      borderWidth: resolverBorderWidth,
       color: resolverColor,
-      textColor: resolverLabelColor ?? resolverColor,
+      labelColor: resolverLabelColor ?? resolverColor,
       surfaceFill: resolverSurfaceFill,
       socketColor: resolverSocketColor,
-      frameInset: e.frameInset,
-      radiusBonus: e.radiusBonus,
-      socketSize: e.socketSize,
-      dashLength: e.dashLength,
-      dashGap: e.dashGap,
-    }
-  }, [
-    labelFontSize,
-    resolverColor,
-    resolverLabelColor,
-    resolverSurfaceFill,
-    resolverSocketColor,
-  ])
+      frameInset: resolverFrameInset,
+      radiusBonus: resolverRadiusBonus,
+      socketSize: resolverSocketSize,
+      dashLength: resolverDashLength,
+      dashGap: resolverDashGap,
+    }),
+    [
+      resolverFontSize,
+      resolverPaddingH,
+      resolverPaddingV,
+      resolverBorderRadius,
+      resolverBorderWidth,
+      resolverColor,
+      resolverLabelColor,
+      resolverSurfaceFill,
+      resolverSocketColor,
+      resolverFrameInset,
+      resolverRadiusBonus,
+      resolverSocketSize,
+      resolverDashLength,
+      resolverDashGap,
+    ]
+  )
 
   const layout = useMemo(
     () =>
@@ -298,6 +307,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
               labelSurfaceBorder={surface.surfaceBorder}
               labelBorderRadius={labelBorderRadius}
               labelLetterSpacing={labelLetterSpacing}
+              primaryLetterSpacing={primaryLetterSpacing}
               slotsFont={node.slotsFont ?? "marist"}
             />
           )
