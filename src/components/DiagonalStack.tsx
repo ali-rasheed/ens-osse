@@ -2,10 +2,10 @@
  * DiagonalStack layers multiple children with a cumulative down-right offset (each step uses
  * offsetX/offsetY). First child is the visual front (no extra translate); later children sit
  * behind. The wrapper adds bottom/right padding so back layers are not clipped. Optional
- * animate: staggered opacity only (transform stays on the layer for layout).
+ * animate: staggered opacity only (transform stays on the layer for layout); respects reduced motion.
  */
 import { Children, type CSSProperties, type ReactNode } from "react"
-import { motion } from "motion/react"
+import { motion, useReducedMotion } from "motion/react"
 
 export interface DiagonalStackProps {
   children: ReactNode
@@ -25,6 +25,7 @@ export function DiagonalStack({
   style,
   animate = false,
 }: DiagonalStackProps) {
+  const reduceMotion = useReducedMotion() === true
   const items = Children.toArray(children).filter((c) => c != null)
   const n = items.length
   if (n === 0) return null
@@ -57,7 +58,7 @@ export function DiagonalStack({
           zIndex: z,
         }
 
-        if (animate) {
+        if (animate && !reduceMotion) {
           return (
             <motion.div
               key={i}
