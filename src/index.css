@@ -90,3 +90,19 @@
     border-top: 1px solid color-mix(in srgb, #0082bb 30%, transparent);
   }
 }
+
+/* Native disclosure: custom caret (summary uses list-style: none inline). */
+.mermaid-onboarding summary::-webkit-details-marker {
+  display: none;
+}
+
+.mermaid-onboarding summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform 0.15s ease;
+}
+
+.mermaid-onboarding[open] summary::before {
+  transform: rotate(90deg);
+}

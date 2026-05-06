@@ -672,6 +672,80 @@ function MermaidInput({ value, onChange, error, chrome }: MermaidInputProps) {
           boxSizing: "border-box",
         }}
       />
+      <details
+        className="mermaid-onboarding"
+        style={{
+          borderTop: chrome.panelBorder,
+          padding: "0 12px 12px",
+          margin: 0,
+        }}
+      >
+        <summary
+          style={{
+            listStyle: "none",
+            cursor: "pointer",
+            padding: "10px 0 8px",
+            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: 0.25,
+            color: chrome.textMuted,
+            userSelect: "none",
+          }}
+        >
+          Getting started with this editor
+        </summary>
+        <div
+          style={{
+            paddingBottom: 4,
+            fontSize: 12,
+            lineHeight: 1.55,
+            color: chrome.textMuted,
+          }}
+        >
+          <p style={{ margin: "0 0 10px" }}>
+            This panel is a small Mermaid-style flowchart: each line is a node or an edge. The
+            diagram updates as you type; invalid syntax shows a parse error in the header.
+          </p>
+          <p style={{ margin: "0 0 8px", fontWeight: 600, color: chrome.text, fontSize: 11 }}>
+            Node shapes
+          </p>
+          <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+            <li>
+              <code style={{ color: chrome.text }}>id[label]</code> — registry (optional{" "}
+              <code style={{ color: chrome.text }}>|slot1|slot2</code> for a hatched slot row)
+            </li>
+            <li>
+              <code style={{ color: chrome.text }}>id(label)</code> — label pill
+            </li>
+            <li>
+              <code style={{ color: chrome.text }}>id((label))</code> — hatched label
+            </li>
+            <li>
+              <code style={{ color: chrome.text }}>{"id{label}"}</code> — dashed resolver
+            </li>
+          </ul>
+          <p style={{ margin: "0 0 8px", fontWeight: 600, color: chrome.text, fontSize: 11 }}>
+            Edges & routing
+          </p>
+          <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+            <li>
+              <code style={{ color: chrome.text }}>{"a --> b"}</code> — default orthogonal edge
+            </li>
+            <li>
+              Add{" "}
+              <code style={{ color: chrome.text }}># fromSlot=0 toSlot=1 route=vhv</code> on the
+              line to pin arrows to hatched slot ports or change the elbow style.
+            </li>
+          </ul>
+          <p style={{ margin: 0 }}>
+            <strong style={{ color: chrome.text }}>Nested registries</strong> (one frame with
+            child cards, as in the default diagram) are not expressible in this Mermaid subset —
+            define them in code as <code style={{ color: chrome.text }}>NodeData.children</code>,
+            or keep using the default source and adjust in the app bundle.
+          </p>
+        </div>
+      </details>
     </div>
   )
 }
