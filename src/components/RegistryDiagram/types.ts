@@ -64,6 +64,27 @@ export interface AnimationConfig {
   spring?: import("motion/react").Transition
 }
 
+/**
+ * Looped “wave” highlight along a shortest directed path between two node IDs.
+ * Renders as a separate Motion layer (rings / stroke overlay) so entrance variants stay intact.
+ */
+export interface PathPulseConfig {
+  from: string
+  to: string
+  /** Delay between each step’s transition start (seconds). */
+  stagger: number
+  /** Time for one step to reach full highlight (or fade out) (seconds). */
+  segmentDuration: number
+  /** Pause at rest (all off) before the next loop (seconds). Default 0. */
+  hold?: number
+  /** Stroke / ring color. Default: lapis/500 from theme. */
+  highlightColor?: string
+  /**
+   * When true (default), path edges use the same timing as their path tail node (into `to` of the edge).
+   */
+  includeEdges?: boolean
+}
+
 export interface DiagramConfig {
   /** Active appearance preset; drives default surface/hatch tokens when set from App. */
   mode?: DiagramMode
