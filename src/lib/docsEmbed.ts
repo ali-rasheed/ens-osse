@@ -1,6 +1,8 @@
 /**
  * Builds a copy-paste artifact for ENS docs (MDX): JSON payload + example stub.
- * Docs can later wire `<RegistryDiagramEmbed />` or a static build step to this schema.
+ * Payload is Mermaid + theme only. The “ENS v2 registry column” (`nested-column`) full layout in the demo app
+ * also applies `mergeNestedColumnDemoNodes` from `nestedColumnDemoData.ts`; embed consumers must
+ * replicate that or pass `NodeData[]` if they need the same nested JSON.
  */
 import type { DiagramMode } from "../components/RegistryDiagram/theme"
 

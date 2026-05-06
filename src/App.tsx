@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { DialRoot, useDialKit } from "dialkit"
 import "dialkit/styles.css"
+import { EnsMarkLogo } from "./components/EnsMarkLogo"
 import { RegistryDiagram } from "./components/RegistryDiagram"
 import {
   ANIMATION_PRESET_OPTIONS,
@@ -258,6 +259,9 @@ export default function App() {
         <h1
           style={{
             margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
             fontFamily: "'ABC Monument Grotesk', ui-sans-serif, system-ui, sans-serif",
             fontSize: 20,
             fontWeight: 500,
@@ -266,7 +270,8 @@ export default function App() {
             letterSpacing: "-0.02em",
           }}
         >
-          Ossë
+          <EnsMarkLogo size={28} />
+          ENS Ossë
         </h1>
       </header>
 

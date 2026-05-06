@@ -5,7 +5,20 @@
  * Protocol / “blueprint” canvas reference (grid, lapis/100 field, 2px lapis/500 strokes,
  * lapis/900 resolver corner squares, plain labels without pill chrome):
  * https://www.figma.com/design/BYUUCeRHgEgzbLZrGmxXHE/Diagram-System?node-id=76-623
+ *
+ * Protocol canvas grid tones are overridable via `--protocol-grid-minor` / `--protocol-grid-major`
+ * on `.app-shell[data-theme="protocol"]` (see `src/index.css`; `prefers-contrast: more` strengthens them).
  */
+import type { CSSProperties } from "react"
+
+/** Marist = ENS record names; Semi-Mono = roles and `0x` wallet lines (Diagram System). */
+export const DIAGRAM_FONTS = {
+  marist: "'ABC Marist', Georgia, serif",
+  semimono: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+} as const
+
+export type DiagramTypography = keyof typeof DIAGRAM_FONTS
+
 export const ENS_TOKENS = {
   "lapis/100": "#dbf0f8",
   "lapis/500": "#0082bb",
@@ -22,8 +35,6 @@ export type DiagramMode = "light" | "dark" | "protocol"
 export interface AppChromeTheme {
   shellBg: string
   mainBg: string
-  /** Optional layered background for diagram column (protocol grid). */
-  mainBgLayered?: string
   asideBg: string
   asideBorder: string
   asideShadow: string
@@ -41,6 +52,13 @@ export interface DiagramPalette {
   nodeColor: string
   labelColor: string
   resolverColor: string
+  /** Label text inside dashed resolver (can differ from stroke for contrast on dark fill). */
+  resolverLabelColor: string
+  /**
+   * Solid fill inside the dashed resolver pill (Diagram System stacked resolver, Figma node
+   * 76:5895: `#141416` on dark).
+   */
+  resolverSurfaceFill: string
   /** Filled corner sockets on dashed resolver frame (Diagram System: lapis/900 in protocol). */
   resolverSocketColor: string
   edgeColor: string
@@ -83,14 +101,14 @@ export const APP_CHROME_BY_MODE: Record<DiagramMode, AppChromeTheme> = {
   protocol: {
     shellBg: T["lapis/100"],
     mainBg: T["lapis/100"],
-    mainBgLayered: undefined, // set in App via protocolMainBackground()
-    asideBg: `color-mix(in srgb, ${T["lapis/100"]} 92%, ${T["lapis/900"]})`,
-    asideBorder: `1px solid color-mix(in srgb, ${T["lapis/500"]} 35%, transparent)`,
+    asideBg: `color-mix(in srgb, ${T["lapis/100"]} 90%, ${T["lapis/900"]})`,
+    asideBorder: `1px solid color-mix(in srgb, ${T["lapis/500"]} 42%, transparent)`,
     asideShadow: `-16px 0 40px color-mix(in srgb, ${T["lapis/900"]} 25%, transparent)`,
     text: T["lapis/900"],
-    textMuted: `color-mix(in srgb, ${T["lapis/500"]} 70%, ${T["lapis/900"]})`,
-    panelBg: `color-mix(in srgb, ${T["lapis/100"]} 88%, ${T["quartz/0"]})`,
-    panelBorder: `1px solid color-mix(in srgb, ${T["lapis/500"]} 30%, transparent)`,
+    /** AA-friendly muted on light lapis-tinted panels (was lapis/500-heavy mix). */
+    textMuted: `color-mix(in srgb, ${T["lapis/900"]} 58%, ${T["quartz/0"]})`,
+    panelBg: `color-mix(in srgb, ${T["lapis/100"]} 82%, ${T["quartz/0"]})`,
+    panelBorder: `1px solid color-mix(in srgb, ${T["lapis/500"]} 38%, transparent)`,
     errorText: "#b71c1c",
     dialKitTheme: "light",
   },
@@ -101,6 +119,8 @@ export const DIAGRAM_PALETTE_BY_MODE: Record<DiagramMode, DiagramPalette> = {
     nodeColor: T["quartz/900"],
     labelColor: T["quartz/900"],
     resolverColor: T["quartz/900"],
+    resolverLabelColor: T["quartz/900"],
+    resolverSurfaceFill: T["quartz/0"],
     resolverSocketColor: T["quartz/900"],
     edgeColor: T["quartz/500"],
     labelSurfaceFill: `color-mix(in srgb, ${T["quartz/500"]} 12%, ${T["quartz/0"]})`,
@@ -113,6 +133,9 @@ export const DIAGRAM_PALETTE_BY_MODE: Record<DiagramMode, DiagramPalette> = {
     nodeColor: T["quartz/0"],
     labelColor: T["quartz/100"],
     resolverColor: T["quartz/0"],
+    resolverLabelColor: T["quartz/0"],
+    /** Figma Diagram System resolver stack (node 76:5895). */
+    resolverSurfaceFill: "#141416",
     resolverSocketColor: T["quartz/0"],
     edgeColor: T["quartz/0"],
     labelSurfaceFill: "rgba(255, 255, 255, 0.06)",
@@ -122,13 +145,16 @@ export const DIAGRAM_PALETTE_BY_MODE: Record<DiagramMode, DiagramPalette> = {
     hatchStripe2: "rgba(255,255,255,0.12)",
   },
   protocol: {
+    /** Double-outline + dashed stroke (Diagram System). */
     nodeColor: T["lapis/500"],
-    labelColor: T["lapis/500"],
+    /** Edge labels + slot Marist text: dark ink on lapis/100 for AA. */
+    labelColor: T["lapis/900"],
     resolverColor: T["lapis/500"],
+    /** Center label on dark resolver fill. */
+    resolverLabelColor: T["lapis/100"],
+    resolverSurfaceFill: `color-mix(in srgb, ${T["lapis/900"]} 82%, ${T["lapis/100"]})`,
     resolverSocketColor: T["lapis/900"],
-    /** Connectors, dots, and arrowheads match stroke blue in Diagram System. */
     edgeColor: T["lapis/500"],
-    /** Plain edge labels: text only on lapis/100 (no pill). */
     labelSurfaceFill: "transparent",
     labelSurfaceBorder: "none",
     hatchBase: `color-mix(in srgb, ${T["lapis/900"]} 8%, ${T["lapis/100"]})`,
@@ -137,21 +163,41 @@ export const DIAGRAM_PALETTE_BY_MODE: Record<DiagramMode, DiagramPalette> = {
   },
 }
 
+const MINOR_GRID_PX = 8
+const MAJOR_GRID_PX = 80
+
 /**
- * Lapis grid-lined canvas (Diagram System node 76:623): blueprint field on lapis/100.
+ * Graph-paper canvas: lapis/100 field, major grid (80px) over minor (8px). Grid line colors use
+ * CSS variables with fallbacks so `index.css` can tune and strengthen under `prefers-contrast: more`.
  */
-export function protocolMainBackground(): string {
-  const bg = T["lapis/100"]
-  const line = `color-mix(in srgb, ${T["lapis/500"]} 22%, transparent)`
-  const grid = [
-    `linear-gradient(${line} 1px, transparent 1px)`,
-    `linear-gradient(90deg, ${line} 1px, transparent 1px)`,
-  ].join(", ")
-  return `${bg} ${grid}`
+export function protocolCanvasStyle(): CSSProperties {
+  const minor = `var(--protocol-grid-minor, color-mix(in srgb, ${T["lapis/500"]} 14%, transparent))`
+  const major = `var(--protocol-grid-major, color-mix(in srgb, ${T["lapis/500"]} 32%, transparent))`
+  return {
+    backgroundColor: T["lapis/100"],
+    backgroundImage: [
+      `linear-gradient(${major} 1px, transparent 1px)`,
+      `linear-gradient(90deg, ${major} 1px, transparent 1px)`,
+      `linear-gradient(${minor} 1px, transparent 1px)`,
+      `linear-gradient(90deg, ${minor} 1px, transparent 1px)`,
+    ].join(", "),
+    backgroundSize: `${MAJOR_GRID_PX}px ${MAJOR_GRID_PX}px, ${MAJOR_GRID_PX}px ${MAJOR_GRID_PX}px, ${MINOR_GRID_PX}px ${MINOR_GRID_PX}px, ${MINOR_GRID_PX}px ${MINOR_GRID_PX}px`,
+    backgroundRepeat: "repeat",
+  }
 }
 
+/** @deprecated Use `protocolCanvasStyle()` for new code. */
+export function protocolMainBackground(): string {
+  const s = protocolCanvasStyle()
+  const images = s.backgroundImage
+  if (typeof images !== "string") return T["lapis/100"]
+  return `${s.backgroundColor ?? ""} ${images}`.trim()
+}
+
+/** @deprecated Use `protocolCanvasStyle().backgroundSize`. */
 export function protocolMainBackgroundSize(): string {
-  return "24px 24px"
+  const s = protocolCanvasStyle()
+  return typeof s.backgroundSize === "string" ? s.backgroundSize : ""
 }
 
 /** Flat color under diagram for PNG export (grid is not rasterized as vector). */

@@ -1,7 +1,11 @@
 import { forwardRef, useMemo } from "react"
 import { motion } from "motion/react"
-import type { Variants, Transition } from "motion/react"
 import type { NodeData, EdgeData, AnimationConfig, DiagramConfig } from "./types"
+import {
+  buildVariants,
+  getArrowheadDelayOffset,
+  resolveAnimationConfig,
+} from "./animationConfig"
 import { computeLayout } from "./layout"
 import { RegistryNode } from "./RegistryNode"
 import { LabelNode } from "./LabelNode"
@@ -13,80 +17,6 @@ interface Props {
   edges: EdgeData[]
   animation?: AnimationConfig
   config?: DiagramConfig
-}
-
-function buildVariants(
-  preset: AnimationConfig["preset"],
-  spring: Transition | undefined,
-  duration: number
-): { node: Variants; edge: Variants } {
-  const none: Variants = { hidden: {}, visible: {} }
-  if (preset === "none") return { node: none, edge: none }
-
-  const nodeTransition: Transition =
-    spring ?? { type: "spring", visualDuration: 0.4, bounce: 0.1 }
-
-  const nodeByPreset: Record<string, Variants> = {
-    fade: {
-      hidden: { opacity: 0 },
-      visible: (delay: number) => ({
-        opacity: 1,
-        transition: { duration, delay },
-      }),
-    },
-    pop: {
-      hidden: { opacity: 0, scale: 0.7 },
-      visible: (delay: number) => ({
-        opacity: 1,
-        scale: 1,
-        transition: { ...nodeTransition, delay },
-      }),
-    },
-    draw: {
-      hidden: { opacity: 0, scale: 0.85 },
-      visible: (delay: number) => ({
-        opacity: 1,
-        scale: 1,
-        transition: { ...nodeTransition, delay },
-      }),
-    },
-  }
-
-  const drawDuration = Math.max(duration * 0.6, 0.25)
-  const edgeByPreset: Record<string, Variants> = {
-    fade: {
-      hidden: { opacity: 0 },
-      visible: (delay: number) => ({
-        opacity: 1,
-        transition: { duration, delay },
-      }),
-    },
-    pop: {
-      hidden: { opacity: 0 },
-      visible: (delay: number) => ({
-        opacity: 1,
-        transition: { duration: duration * 0.5, delay },
-      }),
-    },
-    draw: {
-      hidden: { opacity: 0, pathLength: 0 },
-      visible: (delay: number) => ({
-        opacity: 1,
-        pathLength: 1,
-        transition: {
-          opacity: { duration: duration * 0.2, delay },
-          pathLength: { duration: drawDuration, delay },
-          default: { duration: drawDuration, delay },
-        },
-      }),
-    },
-  }
-
-  const key = preset ?? "fade"
-  return {
-    node: nodeByPreset[key] ?? nodeByPreset.fade,
-    edge: edgeByPreset[key] ?? edgeByPreset.fade,
-  }
 }
 
 export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function RegistryDiagram(
@@ -110,12 +40,16 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     labelPaddingH = 8,
     labelPaddingV = 4,
     labelColor = "#cfcfcf",
+    labelBorderRadius = 12,
+    labelLetterSpacing = 0.05,
     resolverFontSize = 16,
     resolverPaddingH = 16,
     resolverPaddingV = 10,
     resolverBorderRadius = 6,
     resolverBorderWidth = 0.5,
     resolverColor = "#ffffff",
+    resolverLabelColor,
+    resolverSurfaceFill = "transparent",
     resolverSocketColor,
     resolverFrameInset = 10,
     resolverRadiusBonus = 8,
@@ -133,7 +67,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     nodesep = 50,
   } = config
 
-  const { preset = "draw", stagger = 0.08, spring, duration = 0.5 } = animation
+  const { preset, stagger, spring, duration } = resolveAnimationConfig(animation)
 
   const layoutMetrics = useMemo(
     () => ({
@@ -178,6 +112,8 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
       borderRadius: resolverBorderRadius,
       borderWidth: resolverBorderWidth,
       color: resolverColor,
+      labelColor: resolverLabelColor ?? resolverColor,
+      surfaceFill: resolverSurfaceFill,
       socketColor: resolverSocketColor,
       frameInset: resolverFrameInset,
       radiusBonus: resolverRadiusBonus,
@@ -192,6 +128,8 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
       resolverBorderRadius,
       resolverBorderWidth,
       resolverColor,
+      resolverLabelColor,
+      resolverSurfaceFill,
       resolverSocketColor,
       resolverFrameInset,
       resolverRadiusBonus,
@@ -260,14 +198,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
   const nodeDelay = (rank: number) => rank * 2 * stagger
   const edgeDelay = (fromId: string) =>
     ((rankById.get(fromId) ?? 0) * 2 + 1) * stagger
-  const arrowDelayOffset =
-    preset === "draw"
-      ? Math.max(duration * 0.6, 0.25)
-      : preset === "pop"
-        ? duration * 0.5
-        : preset === "none"
-          ? 0
-          : duration
+  const arrowDelayOffset = getArrowheadDelayOffset(preset, duration)
 
   const { node: nodeVariants, edge: edgeVariants } = useMemo(
     () => buildVariants(preset, spring, duration),
@@ -334,6 +265,8 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
           borderRadius: resolverBorderRadius,
           borderWidth: resolverBorderWidth,
           color: resolverColor,
+          labelColor: resolverLabelColor ?? resolverColor,
+          surfaceFill: resolverSurfaceFill,
           socketColor: resolverSocketColor,
           frameInset: resolverFrameInset,
           radiusBonus: resolverRadiusBonus,
@@ -359,6 +292,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
               nestedBorderRadius={nestedRegistryBorderRadius}
               slots={node.slots}
               children={node.children}
+              registryFrame={node.registryFrame}
               slotFontSize={labelFontSize}
               slotPaddingH={labelPaddingH}
               slotPaddingV={labelPaddingV}
@@ -370,13 +304,18 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
               nestedDashed={nestedDashedProps}
               labelSurfaceFill={surface.surfaceFill}
               labelSurfaceBorder={surface.surfaceBorder}
+              labelBorderRadius={labelBorderRadius}
+              labelLetterSpacing={labelLetterSpacing}
+              slotsFont={node.slotsFont ?? "marist"}
             />
           )
-        if (node.type === "dashed") return <DashedNode {...props} {...resolverStyled} />
+        if (node.type === "dashed")
+          return <DashedNode {...props} {...resolverStyled} stackDepth={node.stackDepth} />
         return (
           <LabelNode
             {...props}
             hatched={node.type === "labelHatched"}
+            typography={node.labelFont ?? "marist"}
             fontSize={labelFontSize}
             paddingH={labelPaddingH}
             paddingV={labelPaddingV}
@@ -386,6 +325,8 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
             hatchBase={surface.hatchBase}
             hatchStripe1={surface.hatchStripe1}
             hatchStripe2={surface.hatchStripe2}
+            borderRadius={labelBorderRadius}
+            letterSpacingEm={labelLetterSpacing}
           />
         )
       })}

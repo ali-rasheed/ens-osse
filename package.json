@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "devrel:revisit": "node scripts/devrel-revisit.mjs"
   },
   "dependencies": {
     "dagre": "^0.8.5",

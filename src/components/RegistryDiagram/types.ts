@@ -1,4 +1,4 @@
-import type { DiagramMode } from "./theme"
+import type { DiagramMode, DiagramTypography } from "./theme"
 
 /** `label` = solid pill (Figma default); `labelHatched` = cross-hatch fill (Figma variant 2). */
 export type NodeType = "registry" | "label" | "labelHatched" | "dashed"
@@ -7,6 +7,12 @@ export interface NodeData {
   id: string
   label: string
   type: NodeType
+  /**
+   * `label` / `labelHatched` only: `marist` (default, record-style copy) vs `semimono` (roles, wallet lines).
+   */
+  labelFont?: DiagramTypography
+  /** `registry` only: typography for hatched slot row or nested vertical `slots` stack (default `marist`). */
+  slotsFont?: DiagramTypography
   /** `registry` only: inner hatched slot labels inside one compound frame (Figma Diagram System). */
   slots?: string[]
   /**
@@ -14,6 +20,16 @@ export interface NodeData {
    * When `children?.length` is set, `slots` is ignored for layout/render. Not represented in Mermaid v1.
    */
   children?: NodeData[]
+  /**
+   * `registry` only: `single` = one stroke + frame padding (Diagram System nested cards). Omit or
+   * leave unset for the default double outline (outer + inner border).
+   */
+  registryFrame?: "single"
+  /**
+   * `dashed` only: draw this many offset duplicate frames (front carries the label). Mermaid:
+   * `id{label # stack=N}` with N ≥ 2.
+   */
+  stackDepth?: number
 }
 
 /** Orthogonal routing between non–axis-aligned polyline joints from Dagre. */
@@ -40,6 +56,7 @@ export interface EdgeData {
   orthogonalStyle?: EdgeOrthogonalStyle
 }
 
+/** Passed to `RegistryDiagram`; defaults and variants: `animationConfig.ts`. */
 export interface AnimationConfig {
   preset?: "draw" | "fade" | "pop" | "none"
   stagger?: number
@@ -71,12 +88,20 @@ export interface DiagramConfig {
   labelPaddingH?: number
   labelPaddingV?: number
   labelColor?: string
+  /** Corner radius for plain + hatched label pills (Figma ~12). */
+  labelBorderRadius?: number
+  /** Letter-spacing on Marist label text, in em. */
+  labelLetterSpacing?: number
   resolverFontSize?: number
   resolverPaddingH?: number
   resolverPaddingV?: number
   resolverBorderRadius?: number
   resolverBorderWidth?: number
   resolverColor?: string
+  /** Center label text in dashed resolver; defaults to `resolverColor` when omitted. */
+  resolverLabelColor?: string
+  /** Solid fill inside the dashed resolver frame (Diagram System). */
+  resolverSurfaceFill?: string
   /** Corner square fills on dashed resolver (protocol: lapis/900 per Diagram System). */
   resolverSocketColor?: string
   resolverFrameInset?: number

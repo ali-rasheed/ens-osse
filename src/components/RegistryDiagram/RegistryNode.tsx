@@ -1,24 +1,27 @@
 /**
- * Registry frame: single stroke + inner frame padding (Figma Diagram System). Plain center
- * label, optional hatched `slots` row (top-level compound only), vertical `slots` stack when
- * nested, or recursive `children` column. All label copy uses `letterSpacing: 0.05em` tracking.
+ * Registry frame: default double outline (outer + inner border); `registryFrame === "single"`
+ * uses one stroke + frame padding (Figma nested cards). Plain center label, optional hatched
+ * `slots` row (top-level compound only), vertical `slots` stack when nested, or recursive
+ * `children` column. All label copy uses `letterSpacing: 0.05em` tracking.
  */
+import type { CSSProperties } from "react"
 import { motion } from "motion/react"
 import type { Variants } from "motion/react"
 import type { NodeData } from "./types"
+import type { DiagramTypography } from "./theme"
+import { DIAGRAM_FONTS } from "./theme"
 import {
   REGISTRY_FRAME_PADDING,
   REGISTRY_HEADER_SLOT_GAP,
   REGISTRY_NESTED_CHILD_GAP,
   REGISTRY_SLOT_CELL_GAP,
   REGISTRY_SLOT_TEXT_GAP,
+  REGISTRY_SHELL_GAP,
   layoutNodeDimensions,
   type LayoutOptions,
 } from "./layout"
 import { LabelNode } from "./LabelNode"
 import { DashedNode } from "./DashedNode"
-
-const LABEL_RADIUS = 12
 
 /** Props bundled for compact resolver nodes nested inside a registry column. */
 export interface NestedDashedNodeProps {
@@ -28,6 +31,7 @@ export interface NestedDashedNodeProps {
   borderRadius: number
   borderWidth: number
   color: string
+  surfaceFill?: string
   socketColor?: string
   frameInset: number
   radiusBonus: number
@@ -67,6 +71,14 @@ interface Props {
   nestedDashed?: NestedDashedNodeProps
   labelSurfaceFill?: string
   labelSurfaceBorder?: string
+  /** Pill radius for hatched slot chips and nested label nodes (DialKit Labels). */
+  labelBorderRadius?: number
+  /** Marist tracking in em for slot row + nested labels. */
+  labelLetterSpacing?: number
+  /** Hatched slot row + nested `slots` stack: Marist (records) vs Semi-Mono (roles / wallets). */
+  slotsFont?: DiagramTypography
+  /** Omit or unset for double border (default); `"single"` for one stroke + frame padding. */
+  registryFrame?: NodeData["registryFrame"]
 }
 
 function buildLayoutOpts(props: Props): LayoutOptions {
@@ -127,6 +139,10 @@ export function RegistryNode({
   nestedDashed,
   labelSurfaceFill,
   labelSurfaceBorder,
+  labelBorderRadius = 12,
+  labelLetterSpacing = 0.05,
+  slotsFont = "marist",
+  registryFrame,
 }: Props) {
   const layoutOptions = buildLayoutOpts({
     label,
@@ -157,12 +173,15 @@ export function RegistryNode({
     nestedDashed,
     labelSurfaceFill,
     labelSurfaceBorder,
+    registryFrame,
   })
   const activeChildren = childNodes?.filter(Boolean) ?? []
   const activeSlots = slots?.filter(Boolean) ?? []
   const showHatchedRow = activeChildren.length === 0 && activeSlots.length > 0 && !nested
   const showTextStack = activeChildren.length === 0 && activeSlots.length > 0 && nested
-  const corner = nested ? nestedBorderRadius : borderRadius
+  const singleFrame = registryFrame === "single"
+  const innerCorner = nested ? nestedBorderRadius : borderRadius
+  const outerCorner = innerCorner + REGISTRY_SHELL_GAP
 
   const innerColumn = (
     <>
@@ -218,6 +237,8 @@ export function RegistryNode({
                 nestedDashed,
                 labelSurfaceFill,
                 labelSurfaceBorder,
+                labelBorderRadius,
+                labelLetterSpacing,
               }}
             />
           ))}
@@ -245,7 +266,7 @@ export function RegistryNode({
                 padding: `${slotPaddingV}px ${slotPaddingH}px`,
                 boxSizing: "border-box",
                 overflow: "hidden",
-                borderRadius: LABEL_RADIUS,
+                borderRadius: labelBorderRadius,
                 color: slotColor,
                 whiteSpace: "nowrap",
               }}
@@ -255,7 +276,7 @@ export function RegistryNode({
                 style={{
                   position: "absolute",
                   inset: 0,
-                  borderRadius: LABEL_RADIUS,
+                  borderRadius: labelBorderRadius,
                   backgroundColor: hatchBase,
                   backgroundImage: [
                     `repeating-linear-gradient(45deg, transparent 0 8px, ${hatchStripe1} 8px 9px, transparent 9px 16px)`,
@@ -266,11 +287,11 @@ export function RegistryNode({
               <span
                 style={{
                   position: "relative",
-                  fontFamily: "'ABC Marist', Georgia, serif",
+                  fontFamily: DIAGRAM_FONTS[slotsFont],
                   fontWeight: 400,
                   fontSize: slotFontSize,
                   lineHeight: 1.4,
-                  letterSpacing: "0.05em",
+                  letterSpacing: slotsFont === "semimono" ? "0.05em" : `${labelLetterSpacing}em`,
                   color: slotColor,
                 }}
               >
@@ -296,11 +317,11 @@ export function RegistryNode({
               key={`${line}-${i}`}
               style={{
                 margin: 0,
-                fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+                fontFamily: DIAGRAM_FONTS[slotsFont],
                 fontWeight: 400,
                 fontSize: slotFontSize,
                 lineHeight: 1.4,
-                letterSpacing: "0.05em",
+                letterSpacing: slotsFont === "semimono" ? "0.05em" : `${labelLetterSpacing}em`,
                 color: slotColor,
                 whiteSpace: "nowrap",
                 textAlign: "center",
@@ -316,6 +337,46 @@ export function RegistryNode({
 
   const hasBody = activeChildren.length > 0 || showHatchedRow || showTextStack
 
+  const innerPadStyle: CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: hasBody ? "stretch" : "center",
+    padding: `${paddingV}px ${paddingH}px`,
+    boxSizing: "border-box",
+    flex: activeChildren.length > 0 ? "1 1 auto" : undefined,
+    gap: hasBody ? REGISTRY_HEADER_SLOT_GAP : 0,
+    width: hasBody ? "100%" : undefined,
+    height: singleFrame ? undefined : "100%",
+  }
+
+  if (singleFrame) {
+    return (
+      <motion.div
+        variants={variants}
+        custom={delay}
+        style={{
+          position: nested ? "relative" : "absolute",
+          left: nested ? undefined : x,
+          top: nested ? undefined : y,
+          width,
+          height,
+          boxSizing: "border-box",
+          border: `${borderWidth}px solid ${color}`,
+          borderRadius: innerCorner,
+          padding: REGISTRY_FRAME_PADDING,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: hasBody ? "stretch" : "center",
+          justifyContent: hasBody ? "flex-start" : "center",
+          transformOrigin: "0 0",
+          alignSelf: nested ? "center" : undefined,
+        }}
+      >
+        <div style={innerPadStyle}>{innerColumn}</div>
+      </motion.div>
+    )
+  }
+
   return (
     <motion.div
       variants={variants}
@@ -326,31 +387,29 @@ export function RegistryNode({
         top: nested ? undefined : y,
         width,
         height,
-        boxSizing: "border-box",
+        background: "transparent",
         border: `${borderWidth}px solid ${color}`,
-        borderRadius: corner,
-        padding: REGISTRY_FRAME_PADDING,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: hasBody ? "stretch" : "center",
-        justifyContent: hasBody ? "flex-start" : "center",
+        borderRadius: outerCorner,
+        padding: REGISTRY_SHELL_GAP,
+        boxSizing: "border-box",
         transformOrigin: "0 0",
         alignSelf: nested ? "center" : undefined,
       }}
     >
       <div
         style={{
+          width: "100%",
+          height: "100%",
+          border: `${borderWidth}px solid ${color}`,
+          borderRadius: innerCorner,
+          boxSizing: "border-box",
           display: "flex",
           flexDirection: "column",
           alignItems: hasBody ? "stretch" : "center",
-          padding: `${paddingV}px ${paddingH}px`,
-          boxSizing: "border-box",
-          flex: activeChildren.length > 0 ? "1 1 auto" : undefined,
-          gap: hasBody ? REGISTRY_HEADER_SLOT_GAP : 0,
-          width: hasBody ? "100%" : undefined,
+          justifyContent: hasBody ? "flex-start" : "center",
         }}
       >
-        {innerColumn}
+        <div style={innerPadStyle}>{innerColumn}</div>
       </div>
     </motion.div>
   )
@@ -380,6 +439,8 @@ interface NestedDiagramNodeProps {
     | "nestedDashed"
     | "labelSurfaceFill"
     | "labelSurfaceBorder"
+    | "labelBorderRadius"
+    | "labelLetterSpacing"
   >
 }
 
@@ -420,6 +481,10 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
         hatchBase={registryProps.hatchBase}
         hatchStripe1={registryProps.hatchStripe1}
         hatchStripe2={registryProps.hatchStripe2}
+        labelBorderRadius={registryProps.labelBorderRadius}
+        labelLetterSpacing={registryProps.labelLetterSpacing}
+        slotsFont={node.slotsFont ?? "marist"}
+        registryFrame={node.registryFrame}
       />
     )
   }
@@ -436,6 +501,8 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
         variants={variants}
         delay={delay}
         embedded
+        stackDepth={node.stackDepth}
+        surfaceFill={d.surfaceFill}
         fontSize={d.fontSize}
         paddingH={d.paddingH}
         paddingV={d.paddingV}
@@ -472,6 +539,9 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
       hatchBase={registryProps.hatchBase}
       hatchStripe1={registryProps.hatchStripe1}
       hatchStripe2={registryProps.hatchStripe2}
+      borderRadius={registryProps.labelBorderRadius}
+      letterSpacingEm={registryProps.labelLetterSpacing}
+      typography={node.labelFont ?? "marist"}
     />
   )
 }

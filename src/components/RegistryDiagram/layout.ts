@@ -1,8 +1,9 @@
 /**
  * Dagre layout for registry / label / resolver nodes, plus deterministic sizing for
  * compound registry frames (header + hatched slots or nested `children`), and optional
- * edge anchors on hatched slot bottom-centers (Figma Diagram System ports). Nested
- * registries use a single outer stroke + frame padding (no double outline). Edge polylines
+ * edge anchors on hatched slot bottom-centers (Figma Diagram System ports). Registries default
+ * to a double outline; `registryFrame: "single"` or Mermaid ` # frame=single` uses one stroke.
+ * Edge polylines
  * are orthogonalized to axis-aligned segments (90° only); `pointsToPath` fillets 90° bends
  * using the layout `cornerRadius` (quadratic beziers). Final approach legs are snapped to
  * the target node’s top/bottom center (vertical tail) or left/right center (horizontal tail)
@@ -21,8 +22,14 @@ import type {
 // Char-width ratios per font (px per character at 1px fontSize)
 const CHAR_RATIO = { registry: 0.6, dashed: 0.6, label: 0.5 }
 
+/** XY shift per layer for dashed resolver stacks with `stackDepth` > 1; matches `DiagonalStack` on canvas. */
+export const RESOLVER_STACK_LAYER_OFFSET = 8
+
 /** Padding inside the registry stroke before header / body (Figma `p-[8px]`); keep in sync with `RegistryNode`. */
 export const REGISTRY_FRAME_PADDING = 8
+
+/** Gap between outer and inner registry borders (double-frame default); keep in sync with `RegistryNode`. */
+export const REGISTRY_SHELL_GAP = 3
 
 /** Vertical gap between stacked nested registry cards inside `children`. */
 export const REGISTRY_NESTED_CHILD_GAP = 16
@@ -67,6 +74,30 @@ function registryFrameTotalBreadth(borderWidth: number): number {
   return 2 * registryContentInset(borderWidth)
 }
 
+function registryIsSingleFrame(node: NodeData): boolean {
+  return node.type === "registry" && node.registryFrame === "single"
+}
+
+/** One side of double chrome: border + gap + inner border. */
+export function registryDoubleSideChrome(borderWidth: number): number {
+  return borderWidth + REGISTRY_SHELL_GAP + borderWidth
+}
+
+/** Horizontal/vertical chrome from outer edge to inner content (paddingH/V) start. */
+export function registryLayoutSideInset(node: NodeData, borderWidth: number): number {
+  if (node.type !== "registry") return registryContentInset(borderWidth)
+  return registryIsSingleFrame(node)
+    ? registryContentInset(borderWidth)
+    : registryDoubleSideChrome(borderWidth)
+}
+
+function registryOuterBreadth(node: NodeData, borderWidth: number): number {
+  if (node.type !== "registry") return registryFrameTotalBreadth(borderWidth)
+  return registryIsSingleFrame(node)
+    ? registryFrameTotalBreadth(borderWidth)
+    : 2 * registryDoubleSideChrome(borderWidth)
+}
+
 function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: number } {
   const { type, label, slots, children } = node
   if (type === "label" || type === "labelHatched") {
@@ -81,14 +112,18 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
       opts.resolverPaddingH * 2 +
       shell
     const h = opts.resolverFontSize * 1.4 + opts.resolverPaddingV * 2 + shell
+    const baseW = Math.max(opts.resolverMinWidth, w)
+    const baseH = Math.max(opts.resolverMinHeight, h)
+    const depth = Math.max(1, node.stackDepth ?? 1)
+    const pad = (depth - 1) * RESOLVER_STACK_LAYER_OFFSET
     return {
-      width: Math.max(opts.resolverMinWidth, w),
-      height: Math.max(opts.resolverMinHeight, h),
+      width: baseW + pad,
+      height: baseH + pad,
     }
   }
 
   const minW = 56
-  const frameBreadth = registryFrameTotalBreadth(opts.borderWidth)
+  const frameBreadth = registryOuterBreadth(node, opts.borderWidth)
   const activeChildren =
     type === "registry" && children?.filter(Boolean).length
       ? children!.filter(Boolean)
@@ -430,7 +465,7 @@ export function compoundRegistrySlotBottomCenters(
   if (!slots?.length || node.children?.length) return []
 
   const b = opts.borderWidth
-  const side = registryContentInset(b)
+  const side = registryLayoutSideInset(node, b)
   const innerContentW = pos.width - 2 * side
   const cellWs = slotCellWidths(slots, opts)
   let slotRowInnerW = 0

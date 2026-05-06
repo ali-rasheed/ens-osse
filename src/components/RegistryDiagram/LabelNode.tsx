@@ -1,13 +1,11 @@
 /**
- * Diagram “label” nodes (ABC Marist): two variants aligned with the Diagram System Figma —
- * plain (solid fill) vs hatched (cross-hatch behind type). `hatched` selects the background treatment;
- * typography and padding come from the parent diagram config. Label text uses
- * `letterSpacing: 0.05em` for light tracking.
+ * Diagram label pills: plain (solid fill) vs hatched (`hatched`). Record-style copy uses Marist
+ * by default; `typography="semimono"` matches roles / wallet lines (Semi-Mono + 0.05em tracking).
  */
 import { motion } from "motion/react"
 import type { Variants } from "motion/react"
-
-const LABEL_RADIUS = 12
+import type { DiagramTypography } from "./theme"
+import { DIAGRAM_FONTS } from "./theme"
 
 interface Props {
   label: string
@@ -22,6 +20,8 @@ interface Props {
   paddingV?: number
   color?: string
   hatched: boolean
+  /** Marist (records) vs Semi-Mono (roles / wallets). */
+  typography?: DiagramTypography
   /** Mode-driven pill fill (plain labels). */
   surfaceFill?: string
   surfaceBorder?: string
@@ -30,6 +30,8 @@ interface Props {
   hatchStripe2?: string
   /** Nested in a registry column: no absolute canvas positioning. */
   embedded?: boolean
+  borderRadius?: number
+  letterSpacingEm?: number
 }
 
 export function LabelNode({
@@ -45,12 +47,15 @@ export function LabelNode({
   paddingV = 12,
   color = "#ffffff",
   hatched,
+  typography = "marist",
   surfaceFill = "rgba(255, 255, 255, 0.06)",
   surfaceBorder = "1px solid rgba(255, 255, 255, 0.08)",
   hatchBase = "rgba(255, 255, 255, 0.04)",
   hatchStripe1 = "rgba(255,255,255,0.14)",
   hatchStripe2 = "rgba(255,255,255,0.12)",
   embedded = false,
+  borderRadius = 12,
+  letterSpacingEm = 0.05,
 }: Props) {
   return (
     <motion.div
@@ -68,7 +73,7 @@ export function LabelNode({
         padding: `${paddingV}px ${paddingH}px`,
         boxSizing: "border-box",
         overflow: "hidden",
-        borderRadius: LABEL_RADIUS,
+        borderRadius,
         color,
         whiteSpace: "nowrap",
         background: hatched ? "transparent" : surfaceFill,
@@ -82,7 +87,7 @@ export function LabelNode({
           style={{
             position: "absolute",
             inset: 0,
-            borderRadius: LABEL_RADIUS,
+            borderRadius: borderRadius,
             backgroundColor: hatchBase,
             backgroundImage: [
               `repeating-linear-gradient(45deg, transparent 0 8px, ${hatchStripe1} 8px 9px, transparent 9px 16px)`,
@@ -94,11 +99,11 @@ export function LabelNode({
       <span
         style={{
           position: "relative",
-          fontFamily: "'ABC Marist', Georgia, serif",
+          fontFamily: DIAGRAM_FONTS[typography],
           fontWeight: 400,
           fontSize,
           lineHeight: 1,
-          letterSpacing: "0.05em",
+          letterSpacing: typography === "semimono" ? "0.05em" : `${letterSpacingEm}em`,
           color,
         }}
       >
