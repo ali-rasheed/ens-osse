@@ -81,4 +81,12 @@
     border-left: none;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
+
+  .app-shell[data-theme="light"] .app-aside {
+    border-top: 1px solid color-mix(in srgb, #595755 25%, transparent);
+  }
+
+  .app-shell[data-theme="protocol"] .app-aside {
+    border-top: 1px solid color-mix(in srgb, #0082bb 30%, transparent);
+  }
 }
