@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { DialRoot, useDialKit } from "dialkit"
 import "dialkit/styles.css"
+import { DiagonalStack } from "./components/DiagonalStack"
 import { RegistryDiagram } from "./components/RegistryDiagram"
 import type {
   AnimationConfig,
@@ -298,6 +299,69 @@ export default function App() {
       >
         <ModeSwitch mode={mode} onChange={setMode} chrome={chrome} />
         <ReplayButton onClick={replay} chrome={chrome} />
+        <div
+          style={{
+            width: "100%",
+            padding: 10,
+            borderRadius: 8,
+            border: chrome.panelBorder,
+            background: chrome.panelBg,
+          }}
+        >
+          <p
+            style={{
+              margin: "0 0 8px 0",
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: chrome.textMuted,
+            }}
+          >
+            Diagonal stack
+          </p>
+          <DiagonalStack offsetX={8} offsetY={8}>
+            <div
+              style={{
+                width: 132,
+                height: 44,
+                boxSizing: "border-box",
+                borderRadius: 6,
+                border: `1px dashed ${chrome.textMuted}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "ui-monospace, monospace",
+                fontSize: 12,
+                fontWeight: 600,
+                color: chrome.text,
+                background: chrome.mainBg,
+              }}
+            >
+              Resolvers
+            </div>
+            <div
+              style={{
+                width: 132,
+                height: 44,
+                boxSizing: "border-box",
+                borderRadius: 6,
+                border: `1px dashed ${chrome.textMuted}`,
+                background: "transparent",
+              }}
+            />
+            <div
+              style={{
+                width: 132,
+                height: 44,
+                boxSizing: "border-box",
+                borderRadius: 6,
+                border: `1px dashed ${chrome.textMuted}`,
+                background: "transparent",
+              }}
+            />
+          </DiagonalStack>
+        </div>
         <ExportPanel
           chrome={chrome}
           exportScale={exportScale}
