@@ -22,6 +22,7 @@ import {
 } from "./layout"
 import { LabelNode } from "./LabelNode"
 import { DashedNode } from "./DashedNode"
+import { PathPulseRing } from "./PathPulseRing"
 
 /** Props bundled for compact resolver nodes nested inside a registry column. */
 export interface NestedDashedNodeProps {
@@ -81,6 +82,15 @@ interface Props {
   slotsFont?: DiagramTypography
   /** Omit or unset for double border (default); `"single"` for one stroke + frame padding. */
   registryFrame?: NodeData["registryFrame"]
+  pathPulse?: {
+    active: boolean
+    pathIndex: number
+    pathLength: number
+    stagger: number
+    segmentDuration: number
+    hold: number
+    highlightColor: string
+  }
 }
 
 function buildLayoutOpts(props: Props): LayoutOptions {
@@ -146,6 +156,7 @@ export function RegistryNode({
   primaryLetterSpacing = 0.05,
   slotsFont = "marist",
   registryFrame,
+  pathPulse,
 }: Props) {
   const layoutOptions = buildLayoutOpts({
     label,
@@ -374,8 +385,21 @@ export function RegistryNode({
           justifyContent: hasBody ? "flex-start" : "center",
           transformOrigin: "0 0",
           alignSelf: nested ? "center" : undefined,
+          overflow: pathPulse?.active && pathPulse.pathIndex >= 0 ? "visible" : undefined,
         }}
       >
+        {pathPulse ? (
+          <PathPulseRing
+            active={pathPulse.active}
+            pathIndex={pathPulse.pathIndex}
+            pathLength={pathPulse.pathLength}
+            stagger={pathPulse.stagger}
+            segmentDuration={pathPulse.segmentDuration}
+            hold={pathPulse.hold}
+            highlightColor={pathPulse.highlightColor}
+            borderRadius={innerCorner}
+          />
+        ) : null}
         <div style={innerPadStyle}>{innerColumn}</div>
       </motion.div>
     )
@@ -398,8 +422,21 @@ export function RegistryNode({
         boxSizing: "border-box",
         transformOrigin: "0 0",
         alignSelf: nested ? "center" : undefined,
+        overflow: pathPulse?.active && pathPulse.pathIndex >= 0 ? "visible" : undefined,
       }}
     >
+      {pathPulse ? (
+        <PathPulseRing
+          active={pathPulse.active}
+          pathIndex={pathPulse.pathIndex}
+          pathLength={pathPulse.pathLength}
+          stagger={pathPulse.stagger}
+          segmentDuration={pathPulse.segmentDuration}
+          hold={pathPulse.hold}
+          highlightColor={pathPulse.highlightColor}
+          borderRadius={outerCorner}
+        />
+      ) : null}
       <div
         style={{
           width: "100%",

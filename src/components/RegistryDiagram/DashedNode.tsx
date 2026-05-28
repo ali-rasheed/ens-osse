@@ -8,6 +8,7 @@
 import { motion } from "motion/react"
 import type { Variants } from "motion/react"
 import { DiagonalStack } from "../DiagonalStack"
+import { PathPulseRing } from "./PathPulseRing"
 import { RESOLVER_STACK_LAYER_OFFSET } from "./layout"
 
 const SOCKET_CORNER_RADIUS = 2
@@ -180,6 +181,15 @@ interface Props {
   stackDepth?: number
   /** Fill inside dashed frame; from `DiagramPalette.resolverSurfaceFill`. */
   surfaceFill?: string
+  pathPulse?: {
+    active: boolean
+    pathIndex: number
+    pathLength: number
+    stagger: number
+    segmentDuration: number
+    hold: number
+    highlightColor: string
+  }
 }
 
 export function DashedNode({
@@ -206,6 +216,7 @@ export function DashedNode({
   embedded = false,
   stackDepth = 1,
   surfaceFill = "transparent",
+  pathPulse,
 }: Props) {
   const socketFill = socketColor ?? color
   const depth = Math.max(1, stackDepth ?? 1)
@@ -244,6 +255,8 @@ export function DashedNode({
       </DiagonalStack>
     )
 
+  const ringRadius = borderRadius + radiusBonus
+
   return (
     <motion.div
       variants={variants}
@@ -256,8 +269,21 @@ export function DashedNode({
         height,
         transformOrigin: "0 0",
         alignSelf: embedded ? "center" : undefined,
+        overflow: pathPulse?.active && pathPulse.pathIndex >= 0 ? "visible" : undefined,
       }}
     >
+      {pathPulse ? (
+        <PathPulseRing
+          active={pathPulse.active}
+          pathIndex={pathPulse.pathIndex}
+          pathLength={pathPulse.pathLength}
+          stagger={pathPulse.stagger}
+          segmentDuration={pathPulse.segmentDuration}
+          hold={pathPulse.hold}
+          highlightColor={pathPulse.highlightColor}
+          borderRadius={ringRadius}
+        />
+      ) : null}
       {content}
     </motion.div>
   )

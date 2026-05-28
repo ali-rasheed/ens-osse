@@ -66,3 +66,9 @@
 .mermaid-onboarding[open] summary::before {
   transform: rotate(90deg);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .mermaid-onboarding summary::before {
+    transition: none;
+  }
+}

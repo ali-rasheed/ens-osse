@@ -11,9 +11,23 @@ export interface MermaidTemplate {
   source: string
 }
 
-/** Matches serialized top-level-only view of the app’s nested Registry demo (children not in Mermaid). */
+/**
+ * ENS v2 nested-column preset.
+ * Top-level Mermaid edge remains canonical; comment lines mirror the injected nested `children` tree
+ * so the editor source reflects the rendered diagram structure.
+ */
 export const NESTED_COLUMN_MERMAID = `graph TD
-  registry-root[Registry] --> resolvers{Resolvers # stack=3}`
+  registry-root[Registry] --> resolvers{Resolvers # stack=3}
+  %% nested children rendered inside registry-root:
+  %% <root> # frame=single | owner: 0x0123...
+  %% eth # frame=single | owner: 0x0123...
+  %% workemon.eth # frame=single | owner: 0x0123...
+  %% wallet.workemon.eth # frame=single
+  %%   - owner: 0x0123...
+  %%   - resolver: 0x6789... # dashed
+  %% delegate.workemon.eth # frame=single
+  %%   - owner: 0x0123...
+  %%   - resolver: 0x6789... # dashed`
 
 /**
  * Classic flat ENS-style registry tree: &lt;root&gt; → eth → workemon.eth with hatched slots,
@@ -37,7 +51,7 @@ export const MERMAID_TEMPLATES: MermaidTemplate[] = [
     id: "nested-column",
     title: "ENS v2 registry column",
     description:
-      "Registry shell with nested names (owner lines + resolver cards) and a stacked Resolvers node. Mermaid is only the top-level edge; the demo merges JSON children onto registry-root (see nestedColumnDemoData).",
+      "Registry shell with nested names (owner lines + resolver cards) and a stacked Resolvers node. Mermaid includes a commented hierarchy map; runtime still merges JSON children onto registry-root (see nestedColumnDemoData).",
     thumbnailSrc: "/templates/nested-registry-ens-v2-reference.png",
     source: NESTED_COLUMN_MERMAID,
   },

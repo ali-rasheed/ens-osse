@@ -19,7 +19,8 @@ export const DEFAULT_SPRING_TRANSITION: Transition = {
 export const DEFAULT_ANIMATION_CONFIG: AnimationConfig = {
   preset: "draw",
   stagger: 0.08,
-  duration: 0.5,
+  /** Tween preset (`fade` / edge timings); kept ≤300ms for product-style entrances. */
+  duration: 0.28,
   spring: DEFAULT_SPRING_TRANSITION,
 }
 

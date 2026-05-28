@@ -71,6 +71,9 @@ export interface DiagramPalette {
 
 const T = ENS_TOKENS
 
+/** Default path-pulse ring / edge highlight (lapis/500). */
+export const DEFAULT_PATH_PULSE_HIGHLIGHT = T["lapis/500"]
+
 export const APP_CHROME_BY_MODE: Record<DiagramMode, AppChromeTheme> = {
   light: {
     shellBg: T["quartz/100"],
