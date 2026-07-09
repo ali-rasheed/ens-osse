@@ -3,6 +3,7 @@
  * and retina PNG export of the diagram canvas only.
  */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { motion } from "motion/react"
 import { DialRoot, useDialKit } from "dialkit"
 import "dialkit/styles.css"
 import { EnsMarkLogo } from "./components/EnsMarkLogo"
@@ -32,6 +33,7 @@ import {
   type MermaidTemplate,
 } from "./lib/mermaidTemplates"
 import mermaidPatternsSource from "../docs/mermaid-patterns.md?raw"
+import userGuideSource from "../docs/docs.md?raw"
 import { buildDocsEmbedSnippet } from "./lib/docsEmbed"
 import { downloadDiagramPng, type ExportScale } from "./lib/exportPng"
 import { mergeNestedColumnDemoNodes } from "./lib/nestedColumnDemoData"
@@ -40,6 +42,21 @@ import { mergeNestedColumnDemoNodes } from "./lib/nestedColumnDemoData"
 const DEFAULT_MERMAID = NESTED_COLUMN_MERMAID
 
 const MODES: DiagramMode[] = ["light", "dark", "protocol"]
+
+const DIALKIT_STORAGE_KEY = "ens-osse-dialkit-open"
+const DIALKIT_EXPANDED_WIDTH = 300
+const DIALKIT_COLLAPSED_WIDTH = 40
+
+function readDialKitOpenPreference(): boolean {
+  try {
+    const stored = localStorage.getItem(DIALKIT_STORAGE_KEY)
+    if (stored === "false") return false
+    if (stored === "true") return true
+  } catch {
+    /* ignore */
+  }
+  return true
+}
 
 /** Drop the doc H1 so the panel doesn’t repeat the disclosure title. */
 function mermaidDocPanelBody(md: string): string {
@@ -290,7 +307,10 @@ export default function App() {
     [parsed.nodes, mermaid]
   )
 
-  const embedSnippet = useMemo(() => buildDocsEmbedSnippet(mermaid, mode), [mermaid, mode])
+  const embedSnippet = useMemo(
+    () => buildDocsEmbedSnippet(mermaid, mode, parsed.caption),
+    [mermaid, mode, parsed.caption]
+  )
 
   /* Replay only when the animation preset changes — not on every DialKit tweak (stagger/spring). */
   useEffect(() => {
@@ -433,6 +453,8 @@ export default function App() {
           overflowX: "auto",
         }}
       >
+        <DialKitPanel chrome={chrome} />
+
         <main
           className="app-main"
           style={{
@@ -443,20 +465,47 @@ export default function App() {
             alignItems: "center",
             justifyContent: "center",
             padding: 40,
+            paddingLeft: 24,
             paddingRight: 24,
             overflow: "auto",
             ...mainBackground,
           }}
         >
-          <RegistryDiagram
-            ref={diagramRef}
-            key={key}
-            nodes={diagramNodes}
-            edges={parsed.edges}
-            animation={animationConfig}
-            config={config}
-            pathPulse={pathPulseConfig}
-          />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 24,
+              maxWidth: "100%",
+            }}
+          >
+            <RegistryDiagram
+              ref={diagramRef}
+              key={key}
+              nodes={diagramNodes}
+              edges={parsed.edges}
+              animation={animationConfig}
+              config={config}
+              pathPulse={pathPulseConfig}
+            />
+            {parsed.caption ? (
+              <p
+                style={{
+                  margin: 0,
+                  maxWidth: 640,
+                  fontFamily: "'ABC Marist', Georgia, serif",
+                  fontSize: 15,
+                  lineHeight: 1.55,
+                  letterSpacing: "0.02em",
+                  color: chrome.textMuted,
+                  textAlign: "center",
+                }}
+              >
+                {parsed.caption}
+              </p>
+            ) : null}
+          </div>
         </main>
 
         <aside
@@ -493,18 +542,6 @@ export default function App() {
             copied={embedCopied}
             onCopy={handleCopyEmbed}
           />
-          <div
-            className="sidebar-dialkit"
-            style={{
-              width: "100%",
-              flex: "0 0 auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            <DialRoot mode="inline" defaultOpen theme={chrome.dialKitTheme} />
-          </div>
           <MermaidInput
             value={mermaid}
             onChange={setMermaid}
@@ -516,6 +553,119 @@ export default function App() {
         </aside>
       </div>
     </div>
+  )
+}
+
+/**
+ * Left sidebar for DialKit — inline mode has no native collapse, so the shell owns
+ * expand/collapse (300px ↔ 40px) with persisted preference.
+ */
+function DialKitPanel({
+  chrome,
+}: {
+  chrome: (typeof APP_CHROME_BY_MODE)[DiagramMode]
+}) {
+  const [open, setOpen] = useState(readDialKitOpenPreference)
+  const panelId = "ens-osse-dialkit-panel"
+
+  const toggle = useCallback(() => {
+    setOpen((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(DIALKIT_STORAGE_KEY, String(next))
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }, [])
+
+  return (
+    <motion.aside
+      className="app-dialkit"
+      aria-label="Diagram controls"
+      initial={false}
+      animate={{ width: open ? DIALKIT_EXPANDED_WIDTH : DIALKIT_COLLAPSED_WIDTH }}
+      transition={{ type: "spring", visualDuration: 0.28, bounce: 0.08 }}
+      style={{
+        flex: "0 0 auto",
+        height: "auto",
+        maxHeight: "100vh",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "stretch",
+        background: chrome.asideBg,
+        borderRight: chrome.asideBorder,
+        boxShadow: chrome.asideShadow,
+        position: "relative",
+      }}
+    >
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={open ? "Collapse controls panel" : "Expand controls panel"}
+        style={{
+          position: "absolute",
+          top: 12,
+          right: open ? 8 : "50%",
+          transform: open ? "none" : "translateX(50%)",
+          zIndex: 2,
+          width: 28,
+          height: 28,
+          padding: 0,
+          borderRadius: 6,
+          border: chrome.panelBorder,
+          background: chrome.panelBg,
+          color: chrome.textMuted,
+          fontSize: 14,
+          lineHeight: 1,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {open ? "‹" : "›"}
+      </button>
+      <div
+        id={panelId}
+        className="app-dialkit-content sidebar-dialkit"
+        aria-hidden={!open}
+        style={{
+          flex: "1 1 auto",
+          minHeight: 0,
+          overflowY: open ? "auto" : "hidden",
+          overflowX: "hidden",
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? "auto" : "none",
+          padding: open ? "12px 12px 16px" : 0,
+          paddingTop: open ? 44 : 0,
+          transition: "opacity 0.15s ease",
+        }}
+      >
+        {open ? (
+          <>
+            <div
+              style={{
+                fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: 0.3,
+                color: chrome.textMuted,
+                marginBottom: 10,
+              }}
+            >
+              Layout &amp; style
+            </div>
+            <DialRoot mode="inline" defaultOpen theme={chrome.dialKitTheme} />
+          </>
+        ) : null}
+      </div>
+    </motion.aside>
   )
 }
 
@@ -959,6 +1109,58 @@ function MermaidInput({
           boxSizing: "border-box",
         }}
       />
+      <details
+        className="mermaid-onboarding"
+        style={{
+          borderTop: chrome.panelBorder,
+          padding: "0 12px 0",
+          margin: 0,
+        }}
+      >
+        <summary
+          style={{
+            listStyle: "none",
+            cursor: "pointer",
+            padding: "10px 0 8px",
+            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: 0.25,
+            color: chrome.textMuted,
+            userSelect: "none",
+          }}
+        >
+          How to use Ossë
+        </summary>
+        <div
+          style={{
+            paddingBottom: 12,
+            fontSize: 12,
+            lineHeight: 1.55,
+            color: chrome.textMuted,
+          }}
+        >
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: chrome.textMuted,
+              margin: 0,
+              padding: "10px 10px 8px",
+              maxHeight: 320,
+              overflowY: "auto",
+              borderRadius: 8,
+              border: chrome.panelBorder,
+              background: "color-mix(in srgb, currentColor 6%, transparent)",
+            }}
+          >
+            {mermaidDocPanelBody(userGuideSource)}
+          </pre>
+        </div>
+      </details>
       <details
         className="mermaid-onboarding"
         style={{
