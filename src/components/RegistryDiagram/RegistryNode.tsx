@@ -23,6 +23,11 @@ import {
 import { LabelNode } from "./LabelNode"
 import { DashedNode } from "./DashedNode"
 import { PathPulseRing } from "./PathPulseRing"
+import {
+  MULTILINE_LABEL,
+  bodyLineIsDelegated,
+  bodyLineUsesOwnerFont,
+} from "./linkStyles"
 
 /** Props bundled for compact resolver nodes nested inside a registry column. */
 export interface NestedDashedNodeProps {
@@ -44,6 +49,8 @@ export interface NestedDashedNodeProps {
 interface Props {
   label: string
   slots?: string[]
+  /** Mermaid `<br/>` body lines below title (owner, records, delegation). */
+  bodyLines?: string[]
   children?: NodeData[]
   x: number
   y: number
@@ -125,6 +132,7 @@ function buildLayoutOpts(props: Props): LayoutOptions {
 export function RegistryNode({
   label,
   slots,
+  bodyLines,
   children: childNodes,
   x,
   y,
@@ -191,8 +199,11 @@ export function RegistryNode({
   })
   const activeChildren = childNodes?.filter(Boolean) ?? []
   const activeSlots = slots?.filter(Boolean) ?? []
+  const activeBodyLines = bodyLines?.filter(Boolean) ?? []
   const showHatchedRow = activeChildren.length === 0 && activeSlots.length > 0 && !nested
   const showTextStack = activeChildren.length === 0 && activeSlots.length > 0 && nested
+  const showBodyLines =
+    activeChildren.length === 0 && activeSlots.length === 0 && activeBodyLines.length > 0
   const singleFrame = registryFrame === "single"
   const innerCorner = nested ? nestedBorderRadius : borderRadius
   const outerCorner = innerCorner + REGISTRY_SHELL_GAP
@@ -208,9 +219,11 @@ export function RegistryNode({
           color,
           whiteSpace: "nowrap",
           lineHeight: 1.4,
-          textAlign: showHatchedRow || activeChildren.length > 0 ? "center" : undefined,
+          textAlign: showHatchedRow || activeChildren.length > 0 || showBodyLines ? "center" : undefined,
           alignSelf:
-            showHatchedRow || activeChildren.length > 0 || showTextStack ? "center" : undefined,
+            showHatchedRow || activeChildren.length > 0 || showTextStack || showBodyLines
+              ? "center"
+              : undefined,
         }}
       >
         {label}
@@ -347,10 +360,96 @@ export function RegistryNode({
           ))}
         </div>
       ) : null}
+
+      {showBodyLines ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: REGISTRY_SLOT_TEXT_GAP,
+            width: "100%",
+          }}
+        >
+          {activeBodyLines.map((line, i) => {
+            const delegated = bodyLineIsDelegated(line)
+            const ownerLine = bodyLineUsesOwnerFont(line)
+            const lineFont = ownerLine
+              ? MULTILINE_LABEL.titleFont
+              : MULTILINE_LABEL.bodyFont
+            if (delegated) {
+              return (
+                <div
+                  key={`${line}-${i}`}
+                  style={{
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: `${slotPaddingV}px ${slotPaddingH}px`,
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                    borderRadius: labelBorderRadius,
+                    color: slotColor,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <div
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      borderRadius: labelBorderRadius,
+                      backgroundColor: hatchBase,
+                      backgroundImage: [
+                        `repeating-linear-gradient(45deg, transparent 0 8px, ${hatchStripe1} 8px 9px, transparent 9px 16px)`,
+                        `repeating-linear-gradient(-45deg, transparent 0 8px, ${hatchStripe2} 8px 9px, transparent 9px 16px)`,
+                      ].join(", "),
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: "relative",
+                      fontFamily: DIAGRAM_FONTS[lineFont],
+                      fontWeight: 400,
+                      fontSize: slotFontSize,
+                      lineHeight: 1.4,
+                      letterSpacing:
+                        lineFont === "semimono" ? "0.05em" : `${labelLetterSpacing}em`,
+                      color: slotColor,
+                    }}
+                  >
+                    {line}
+                  </span>
+                </div>
+              )
+            }
+            return (
+              <p
+                key={`${line}-${i}`}
+                style={{
+                  margin: 0,
+                  fontFamily: DIAGRAM_FONTS[lineFont],
+                  fontWeight: 400,
+                  fontSize: slotFontSize,
+                  lineHeight: 1.4,
+                  letterSpacing:
+                    lineFont === "semimono" ? "0.05em" : `${labelLetterSpacing}em`,
+                  color: slotColor,
+                  whiteSpace: "nowrap",
+                  textAlign: "center",
+                }}
+              >
+                {line}
+              </p>
+            )
+          })}
+        </div>
+      ) : null}
     </>
   )
 
-  const hasBody = activeChildren.length > 0 || showHatchedRow || showTextStack
+  const hasBody = activeChildren.length > 0 || showHatchedRow || showTextStack || showBodyLines
 
   const innerPadStyle: CSSProperties = {
     display: "flex",
@@ -497,6 +596,7 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
       <RegistryNode
         label={node.label}
         slots={node.slots}
+        bodyLines={node.bodyLines}
         children={node.children}
         x={0}
         y={0}

@@ -74,6 +74,9 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     cornerRadius = 10,
     dotRadius = 4,
     edgeColor = "#ffffff",
+    edgeLabelFill,
+    edgeLabelBorder,
+    edgeLabelColor,
     ranksep = 70,
     nodesep = 50,
   } = config
@@ -82,6 +85,10 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
   const prefersReducedMotion = useReducedMotion() === true
   /** Empty variants + instant arrow; also used when `prefers-reduced-motion` is set. */
   const displayPreset = prefersReducedMotion ? "none" : preset
+
+  const resolvedEdgeLabelFill = edgeLabelFill ?? labelSurfaceFill ?? "rgba(255,255,255,0.08)"
+  const resolvedEdgeLabelBorder = edgeLabelBorder ?? labelSurfaceBorder ?? "rgba(255,255,255,0.2)"
+  const resolvedEdgeLabelColor = edgeLabelColor ?? labelColor
 
   const layoutMetrics = useMemo(
     () => ({
@@ -325,6 +332,9 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
             arrowDelayOffset={arrowDelayOffset}
             instantArrowhead={instantArrowhead}
             pathPulse={edgePathPulseProps(edgeIdx)}
+            edgeLabelFill={resolvedEdgeLabelFill}
+            edgeLabelBorder={resolvedEdgeLabelBorder}
+            edgeLabelColor={resolvedEdgeLabelColor}
           />
         ))}
       </svg>
@@ -371,6 +381,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
               {...styled}
               nestedBorderRadius={nestedRegistryBorderRadius}
               slots={node.slots}
+              bodyLines={node.bodyLines}
               children={node.children}
               registryFrame={node.registryFrame}
               slotFontSize={labelFontSize}
