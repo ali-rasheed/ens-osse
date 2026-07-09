@@ -4,10 +4,12 @@ Roadmap for turning [`src/components/RegistryDiagram/`](../src/components/Regist
 
 ## Target shape
 
+Naming decision (product, package, schema, fence): [naming.md](./naming.md). Target package **`@ensdomains/osse`**.
+
 - Root `package.json` gains `workspaces: ["packages/*"]`.
-- New `packages/registry-diagram` (name TBD, e.g. `@ens/registry-diagram`) holds moved sources; demo app depends on `workspace:*`.
+- New `packages/osse` holds moved sources; demo app depends on `workspace:*`.
 - Build: ESM + `.d.ts`; peers: `react`, `react-dom`, `motion`; optional subpaths for `./mermaid` and `./export`.
 
 ## Before first publish
 
-See [devrel.md](./devrel.md) and run `npm run devrel:revisit`. Confirm README live URL, embed docs, and any change to `ens-registry-diagram/v1` or parser behavior is noted for consumers.
+See [devrel.md](./devrel.md) and run `npm run devrel:revisit`. Confirm README live URL, embed docs, and any change to `ens-osse/v1` (see [naming.md](./naming.md)) or parser behavior is noted for consumers.

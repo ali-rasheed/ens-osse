@@ -108,7 +108,7 @@ Alias edges (`-. alias .->`) always use the dedicated alias router; `route=` doe
 
 ## Embed in docs
 
-Copy the **Docs embed (MDX)** snippet from the right panel. Payload schema: `ens-registry-diagram/v1` with `mermaid`, `mode`, and optional `caption`.
+Copy the **Docs embed (MDX)** snippet from the right panel. Payload schema: `ens-osse/v1` (see [naming.md](./naming.md)) with `mermaid`, `mode`, and optional `caption`.
 
 **Nested column caveat:** the live demo merges JSON `children` onto `registry-root` for the nested-column preset. Mermaid alone cannot express nested registries — docs consumers need the same merge or raw `NodeData[]`. See [mermaid-patterns.md § Nested registries](./mermaid-patterns.md#nested-registries).
 

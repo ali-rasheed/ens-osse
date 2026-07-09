@@ -16,8 +16,8 @@ import {
 } from "./animationConfig"
 import { computeLayout } from "./layout"
 import { RegistryNode } from "./RegistryNode"
-import { LabelNode } from "./LabelNode"
-import { DashedNode } from "./DashedNode"
+import { PillNode } from "./PillNode"
+import { ResolverNode } from "./ResolverNode"
 import { DiagramEdge, ArrowheadDef } from "./DiagramEdge"
 
 interface Props {
@@ -125,7 +125,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     ]
   )
 
-  const nestedDashedProps = useMemo(
+  const nestedResolverProps = useMemo(
     () => ({
       fontSize: resolverFontSize,
       paddingH: resolverPaddingH,
@@ -133,7 +133,6 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
       borderRadius: resolverBorderRadius,
       borderWidth: resolverBorderWidth,
       color: resolverColor,
-      labelColor: resolverLabelColor ?? resolverColor,
       surfaceFill: resolverSurfaceFill,
       socketColor: resolverSocketColor,
       frameInset: resolverFrameInset,
@@ -355,7 +354,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
           borderRadius: resolverBorderRadius,
           borderWidth: resolverBorderWidth,
           color: resolverColor,
-          labelColor: resolverLabelColor ?? resolverColor,
+          titleColor: resolverLabelColor ?? resolverColor,
           surfaceFill: resolverSurfaceFill,
           socketColor: resolverSocketColor,
           frameInset: resolverFrameInset,
@@ -366,7 +365,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
         }
         const props = {
           key: node.id,
-          label: node.label,
+          title: node.title,
           x: node.x,
           y: node.y,
           width: node.width,
@@ -392,7 +391,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
               hatchStripe1={hatchStripe1}
               hatchStripe2={hatchStripe2}
               layoutOptions={layoutMetrics}
-              nestedDashed={nestedDashedProps}
+              nestedResolver={nestedResolverProps}
               labelSurfaceFill={surface.surfaceFill}
               labelSurfaceBorder={surface.surfaceBorder}
               labelBorderRadius={labelBorderRadius}
@@ -402,9 +401,9 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
               pathPulse={nodePathPulseProps(node.id)}
             />
           )
-        if (node.type === "dashed")
+        if (node.type === "resolver")
           return (
-            <DashedNode
+            <ResolverNode
               {...props}
               {...resolverStyled}
               stackDepth={node.stackDepth}
@@ -412,9 +411,9 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
             />
           )
         return (
-          <LabelNode
+          <PillNode
             {...props}
-            hatched={node.type === "labelHatched"}
+            hatched={node.hatched === true}
             typography={node.labelFont ?? "marist"}
             fontSize={labelFontSize}
             paddingH={labelPaddingH}

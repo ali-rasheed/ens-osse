@@ -3,13 +3,15 @@
  * Payload is Mermaid + theme (+ optional caption). The “ENS v2 registry column” (`nested-column`)
  * full layout in the demo app also applies `mergeNestedColumnDemoNodes` from `nestedColumnDemoData.ts`;
  * embed consumers must replicate that or pass `NodeData[]` if they need the same nested JSON.
+ *
+ * Schema and public names: `docs/naming.md`.
  */
 import type { DiagramMode } from "../components/RegistryDiagram/theme"
 
-export const ENS_REGISTRY_DIAGRAM_SCHEMA = "ens-registry-diagram/v1" as const
+export const OSSE_EMBED_SCHEMA = "ens-osse/v1" as const
 
 export interface DocsEmbedPayload {
-  schema: typeof ENS_REGISTRY_DIAGRAM_SCHEMA
+  schema: typeof OSSE_EMBED_SCHEMA
   mermaid: string
   mode: DiagramMode
   /** Optional prose from `%% caption:` in Mermaid source. */
@@ -22,7 +24,7 @@ export function buildDocsEmbedSnippet(
   caption?: string
 ): string {
   const payload: DocsEmbedPayload = {
-    schema: ENS_REGISTRY_DIAGRAM_SCHEMA,
+    schema: OSSE_EMBED_SCHEMA,
     mermaid,
     mode,
     ...(caption?.trim() ? { caption: caption.trim() } : {}),
@@ -35,7 +37,7 @@ export function buildDocsEmbedSnippet(
     : ""
 
   return [
-    "{/* ENS Registry Diagram — embed payload for docs (e.g. ensdomains/docs). */}",
+    "{/* ENS Ossë — embed payload for docs (e.g. ensdomains/docs). */}",
     "",
     "Payload (JSON):",
     "",
@@ -46,7 +48,7 @@ export function buildDocsEmbedSnippet(
     "Example MDX once an embed component exists in the docs app:",
     "",
     "```mdx",
-    "<RegistryDiagramEmbed",
+    "<OsseEmbed",
     `  mermaid={${mermaidOneLine}}`,
     `  mode="${mode}"${captionProp}`,
     "/>",

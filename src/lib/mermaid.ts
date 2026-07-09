@@ -1,7 +1,6 @@
 import type {
   NodeData,
   EdgeData,
-  NodeType,
 } from "../components/RegistryDiagram/types"
 import type { LinkStyle } from "../components/RegistryDiagram/linkStyles"
 
@@ -41,17 +40,17 @@ function splitLabelAndHashMeta(body: string): { main: string; meta: string } {
 }
 
 /** Split Mermaid `<br/>` / `<br>` multiline text into title + body lines. */
-function splitMultilineLabel(raw: string): { label: string; bodyLines?: string[] } {
+function splitMultilineLabel(raw: string): { title: string; bodyLines?: string[] } {
   const normalized = raw.replace(/<br\s*\/?>/gi, "\n")
   const lines = normalized
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean)
   if (lines.length <= 1) {
-    return { label: lines[0] ?? raw.trim() }
+    return { title: lines[0] ?? raw.trim() }
   }
-  const [label, ...bodyLines] = lines
-  return { label, bodyLines }
+  const [title, ...bodyLines] = lines
+  return { title, bodyLines }
 }
 
 /** Strip optional outer quotes from Mermaid `id["text"]` bracket bodies. */
@@ -97,7 +96,7 @@ function mergeLinesWithOpenBraces(lines: string[]): string[] {
   return out
 }
 
-function parseDashedBrace(body: string): Omit<NodeData, "id"> {
+function parseResolverBrace(body: string): Omit<NodeData, "id"> {
   const { main, meta } = splitLabelAndHashMeta(body)
   let stackDepth: number | undefined
   for (const bit of meta.split(/\s+/).filter(Boolean)) {
@@ -107,8 +106,8 @@ function parseDashedBrace(body: string): Omit<NodeData, "id"> {
       if (n >= 2 && n <= 24) stackDepth = n
     }
   }
-  const { label, bodyLines } = splitMultilineLabel(main.replace(/\s+/g, " ").trim())
-  const base: Omit<NodeData, "id"> = { label, type: "dashed" }
+  const { title, bodyLines } = splitMultilineLabel(main.replace(/\s+/g, " ").trim())
+  const base: Omit<NodeData, "id"> = { title, type: "resolver" }
   if (bodyLines?.length) return { ...base, bodyLines }
   if (stackDepth != null) return { ...base, stackDepth }
   return base
@@ -122,13 +121,13 @@ function parseRegistryBracket(body: string): NodeData {
     ? main.split("|").map((p) => p.trim())
     : [main.trim()]
   const multiline = splitMultilineLabel(hasPipeSlots ? (parts[0] ?? "") : main.trim())
-  const label = hasPipeSlots ? (parts[0] ?? multiline.label) : multiline.label
+  const title = hasPipeSlots ? (parts[0] ?? multiline.title) : multiline.title
   const slots = hasPipeSlots ? parts.slice(1).filter(Boolean) : undefined
   let registryFrame: NodeData["registryFrame"]
   for (const bit of meta.split(/\s+/)) {
     if (bit === "frame=single" || bit === "border=single") registryFrame = "single"
   }
-  const base: NodeData = { id: "", label, type: "registry", registryFrame }
+  const base: NodeData = { id: "", title, type: "registry", registryFrame }
   if (multiline.bodyLines?.length) {
     return { ...base, bodyLines: multiline.bodyLines, ...(slots?.length ? { slots } : {}) }
   }
@@ -136,9 +135,9 @@ function parseRegistryBracket(body: string): NodeData {
   return base
 }
 
-function parseLabelText(text: string): Pick<NodeData, "label" | "bodyLines"> {
-  const { label, bodyLines } = splitMultilineLabel(text.trim())
-  return bodyLines?.length ? { label, bodyLines } : { label }
+function parsePillText(text: string): Pick<NodeData, "title" | "bodyLines"> {
+  const { title, bodyLines } = splitMultilineLabel(text.trim())
+  return bodyLines?.length ? { title, bodyLines } : { title }
 }
 
 /** Optional tail on edge lines: `a --> b # fromSlot=0 toSlot=1 route=vhv` */
@@ -289,14 +288,14 @@ function parseEndpoint(raw: string): Endpoint {
   const id = m[1]
   if (m[2] !== undefined) return { id, node: { ...parseRegistryBracket(m[2]), id } }
   if (m[3] !== undefined) {
-    const parsed = parseLabelText(m[3])
-    return { id, node: { id, ...parsed, type: "labelHatched" } }
+    const parsed = parsePillText(m[3])
+    return { id, node: { id, ...parsed, type: "pill", hatched: true } }
   }
   if (m[4] !== undefined) {
-    const parsed = parseLabelText(m[4])
-    return { id, node: { id, ...parsed, type: "label" } }
+    const parsed = parsePillText(m[4])
+    return { id, node: { id, ...parsed, type: "pill" } }
   }
-  if (m[5] !== undefined) return { id, node: { ...parseDashedBrace(m[5]), id } }
+  if (m[5] !== undefined) return { id, node: { ...parseResolverBrace(m[5]), id } }
   return { id }
 }
 
@@ -367,10 +366,10 @@ export function parseMermaid(src: string): ParsedGraph {
         if (ep.node && !nodeMap.has(ep.id)) nodeMap.set(ep.id, ep.node)
       }
     }
-    // Fill in any referenced-but-undeclared nodes as registry with id as label
+    // Fill in any referenced-but-undeclared nodes as registry with id as title
     for (const e of edges) {
-      if (!nodeMap.has(e.from)) nodeMap.set(e.from, { id: e.from, label: e.from, type: "registry" })
-      if (!nodeMap.has(e.to)) nodeMap.set(e.to, { id: e.to, label: e.to, type: "registry" })
+      if (!nodeMap.has(e.from)) nodeMap.set(e.from, { id: e.from, title: e.from, type: "registry" })
+      if (!nodeMap.has(e.to)) nodeMap.set(e.to, { id: e.to, title: e.to, type: "registry" })
     }
     return { nodes: Array.from(nodeMap.values()), edges, caption }
   } catch (err) {
@@ -382,15 +381,14 @@ export function parseMermaid(src: string): ParsedGraph {
   }
 }
 
-const BRACKETS: Record<NodeType, readonly [string, string]> = {
-  registry: ["[", "]"],
-  label: ["(", ")"],
-  labelHatched: ["((", "))"],
-  dashed: ["{", "}"],
+function nodeBrackets(n: NodeData): readonly [string, string] {
+  if (n.type === "registry") return ["[", "]"]
+  if (n.type === "resolver") return ["{", "}"]
+  return n.hatched ? ["((", "))"] : ["(", ")"]
 }
 
 function formatNodeLabel(n: NodeData): string {
-  const lines = n.bodyLines?.length ? [n.label, ...n.bodyLines] : [n.label]
+  const lines = n.bodyLines?.length ? [n.title, ...n.bodyLines] : [n.title]
   const text = lines.join("<br/>")
   return text.includes("|") || text.includes("<br") ? `"${text}"` : text
 }
@@ -422,22 +420,22 @@ export function serializeMermaid(
     declared.add(id)
     const n = nodeMap.get(id)
     if (!n) return id
-    const [open, close] = BRACKETS[n.type]
+    const [open, close] = nodeBrackets(n)
     const singleSuffix = n.type === "registry" && n.registryFrame === "single" ? " # frame=single" : ""
     if (n.type === "registry" && n.slots?.length) {
-      return `${id}${open}${[n.label, ...n.slots].join("|")}${singleSuffix}${close}`
+      return `${id}${open}${[n.title, ...n.slots].join("|")}${singleSuffix}${close}`
     }
     if (n.type === "registry") {
-      const body = n.bodyLines?.length ? formatNodeLabel(n) : n.label
+      const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
       return `${id}${open}${body}${singleSuffix}${close}`
     }
-    if (n.type === "dashed") {
+    if (n.type === "resolver") {
       const stack =
         n.stackDepth != null && n.stackDepth >= 2 ? ` # stack=${n.stackDepth}` : ""
-      const body = n.bodyLines?.length ? formatNodeLabel(n) : n.label
+      const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
       return `${id}${open}${body}${stack}${close}`
     }
-    const body = n.bodyLines?.length ? formatNodeLabel(n) : n.label
+    const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
     return `${id}${open}${body}${close}`
   }
   const edgeAnchorSuffix = (e: EdgeData): string => {

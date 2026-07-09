@@ -12,48 +12,48 @@ export const NESTED_COLUMN_ROOT_ID = "registry-root" as const
 /** Full registry node including nested children (merged onto parsed Mermaid for the nested preset). */
 export const NESTED_COLUMN_REGISTRY_ROOT: NodeData = {
   id: NESTED_COLUMN_ROOT_ID,
-  label: "Registry",
+  title: "Registry",
   type: "registry",
   children: [
     {
       id: "nest-root",
-      label: "<root>",
+      title: "<root>",
       type: "registry",
       registryFrame: "single",
       slots: ["owner: 0x0123..."],
     },
     {
       id: "nest-eth",
-      label: "eth",
+      title: "eth",
       type: "registry",
       registryFrame: "single",
       slots: ["owner: 0x0123..."],
     },
     {
       id: "nest-workemon",
-      label: "workemon.eth",
+      title: "workemon.eth",
       type: "registry",
       registryFrame: "single",
       slots: ["owner: 0x0123..."],
     },
     {
       id: "nest-wallet",
-      label: "wallet.workemon.eth",
+      title: "wallet.workemon.eth",
       type: "registry",
       registryFrame: "single",
       children: [
-        { id: "w-owner", label: "owner: 0x0123...", type: "label" },
-        { id: "w-res", label: "resolver: 0x6789...", type: "dashed" },
+        { id: "w-owner", title: "owner: 0x0123...", type: "pill" },
+        { id: "w-res", title: "resolver: 0x6789...", type: "resolver" },
       ],
     },
     {
       id: "nest-delegate",
-      label: "delegate.workemon.eth",
+      title: "delegate.workemon.eth",
       type: "registry",
       registryFrame: "single",
       children: [
-        { id: "d-owner", label: "owner: 0x0123...", type: "label" },
-        { id: "d-res", label: "resolver: 0x6789...", type: "dashed" },
+        { id: "d-owner", title: "owner: 0x0123...", type: "pill" },
+        { id: "d-res", title: "resolver: 0x6789...", type: "resolver" },
       ],
     },
   ],

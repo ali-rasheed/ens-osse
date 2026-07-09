@@ -140,7 +140,7 @@ export default function App() {
     },
   })
 
-  const labels = useDialKit("Labels (pills)", {
+  const labels = useDialKit("Pills", {
     appearance: {
       _collapsed: true,
       /** Pill chrome + hatch only; typography for registry slots lives under Registry cards → owner. */

@@ -20,8 +20,8 @@ import {
   layoutNodeDimensions,
   type LayoutOptions,
 } from "./layout"
-import { LabelNode } from "./LabelNode"
-import { DashedNode } from "./DashedNode"
+import { PillNode } from "./PillNode"
+import { ResolverNode } from "./ResolverNode"
 import { PathPulseRing } from "./PathPulseRing"
 import {
   MULTILINE_LABEL,
@@ -30,7 +30,7 @@ import {
 } from "./linkStyles"
 
 /** Props bundled for compact resolver nodes nested inside a registry column. */
-export interface NestedDashedNodeProps {
+export interface NestedResolverNodeProps {
   fontSize: number
   paddingH: number
   paddingV: number
@@ -47,7 +47,7 @@ export interface NestedDashedNodeProps {
 }
 
 interface Props {
-  label: string
+  title: string
   slots?: string[]
   /** Mermaid `<br/>` body lines below title (owner, records, delegation). */
   bodyLines?: string[]
@@ -76,10 +76,10 @@ interface Props {
   nested?: boolean
   /** Same numbers passed to `computeLayout` / `layoutNodeDimensions` for nested sizing. */
   layoutOptions?: LayoutOptions
-  nestedDashed?: NestedDashedNodeProps
+  nestedResolver?: NestedResolverNodeProps
   labelSurfaceFill?: string
   labelSurfaceBorder?: string
-  /** Pill radius for hatched slot chips and nested label nodes (DialKit Labels). */
+  /** Pill radius for hatched slot chips and nested pill nodes (DialKit Pills). */
   labelBorderRadius?: number
   /** Marist tracking in em for slot row + nested labels. */
   labelLetterSpacing?: number
@@ -130,7 +130,7 @@ function buildLayoutOpts(props: Props): LayoutOptions {
 }
 
 export function RegistryNode({
-  label,
+  title,
   slots,
   bodyLines,
   children: childNodes,
@@ -156,7 +156,7 @@ export function RegistryNode({
   hatchStripe2 = "rgba(255,255,255,0.12)",
   nested = false,
   layoutOptions: layoutOptionsProp,
-  nestedDashed,
+  nestedResolver,
   labelSurfaceFill,
   labelSurfaceBorder,
   labelBorderRadius = 12,
@@ -167,7 +167,7 @@ export function RegistryNode({
   pathPulse,
 }: Props) {
   const layoutOptions = buildLayoutOpts({
-    label,
+    title,
     slots,
     children: childNodes,
     x,
@@ -192,7 +192,7 @@ export function RegistryNode({
     hatchStripe2,
     nested,
     layoutOptions: layoutOptionsProp,
-    nestedDashed,
+    nestedResolver,
     labelSurfaceFill,
     labelSurfaceBorder,
     registryFrame,
@@ -226,7 +226,7 @@ export function RegistryNode({
               : undefined,
         }}
       >
-        {label}
+        {title}
       </div>
 
       {activeChildren.length > 0 ? (
@@ -241,7 +241,7 @@ export function RegistryNode({
         >
           {activeChildren.map((child, i) => (
             <NestedDiagramNode
-              key={child.id || `${child.label}-${i}`}
+              key={child.id || `${child.title}-${i}`}
               node={child}
               variants={variants}
               delay={delay + 0.03 * (i + 1)}
@@ -261,7 +261,7 @@ export function RegistryNode({
                 hatchBase,
                 hatchStripe1,
                 hatchStripe2,
-                nestedDashed,
+                nestedResolver,
                 labelSurfaceFill,
                 labelSurfaceBorder,
                 labelBorderRadius,
@@ -576,7 +576,7 @@ interface NestedDiagramNodeProps {
     | "hatchBase"
     | "hatchStripe1"
     | "hatchStripe2"
-    | "nestedDashed"
+    | "nestedResolver"
     | "labelSurfaceFill"
     | "labelSurfaceBorder"
     | "labelBorderRadius"
@@ -594,7 +594,7 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
   if (node.type === "registry") {
     return (
       <RegistryNode
-        label={node.label}
+        title={node.title}
         slots={node.slots}
         bodyLines={node.bodyLines}
         children={node.children}
@@ -606,7 +606,7 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
         delay={delay}
         nested
         layoutOptions={layoutOptions}
-        nestedDashed={registryProps.nestedDashed}
+        nestedResolver={registryProps.nestedResolver}
         labelSurfaceFill={registryProps.labelSurfaceFill}
         labelSurfaceBorder={registryProps.labelSurfaceBorder}
         fontSize={registryProps.fontSize}
@@ -632,11 +632,11 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
     )
   }
 
-  if (node.type === "dashed" && registryProps.nestedDashed) {
-    const d = registryProps.nestedDashed
+  if (node.type === "resolver" && registryProps.nestedResolver) {
+    const d = registryProps.nestedResolver
     return (
-      <DashedNode
-        label={node.label}
+      <ResolverNode
+        title={node.title}
         x={0}
         y={0}
         width={width}
@@ -663,8 +663,8 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
   }
 
   return (
-    <LabelNode
-      label={node.label}
+    <PillNode
+      title={node.title}
       x={0}
       y={0}
       width={width}
@@ -672,7 +672,7 @@ function NestedDiagramNode({ node, variants, delay, layoutOptions, registryProps
       variants={variants}
       delay={delay}
       embedded
-      hatched={node.type === "labelHatched"}
+      hatched={node.hatched === true}
       fontSize={registryProps.slotFontSize}
       paddingH={registryProps.slotPaddingH}
       paddingV={registryProps.slotPaddingV}

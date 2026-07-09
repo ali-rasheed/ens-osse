@@ -3,15 +3,17 @@ import type { LinkStyle } from "./linkStyles"
 
 export type { LinkStyle } from "./linkStyles"
 
-/** `label` = solid pill (Figma default); `labelHatched` = cross-hatch fill (Figma variant 2). */
-export type NodeType = "registry" | "label" | "labelHatched" | "dashed"
+/** `pill` = rounded record chip; `hatched` modifier = cross-hatch fill (mermaid `((…))`). */
+export type NodeType = "registry" | "pill" | "resolver"
 
 export interface NodeData {
   id: string
-  label: string
+  title: string
   type: NodeType
+  /** Cross-hatch fill on `pill` nodes (mermaid `((…))`). */
+  hatched?: boolean
   /**
-   * `label` / `labelHatched` only: `marist` (default, record-style copy) vs `semimono` (roles, wallet lines).
+   * `pill` only: `marist` (default, record-style copy) vs `semimono` (roles, wallet lines).
    */
   labelFont?: DiagramTypography
   /** `registry` only: typography for hatched slot row or nested vertical `slots` stack (default `marist`). */
@@ -29,8 +31,8 @@ export interface NodeData {
    */
   registryFrame?: "single"
   /**
-   * `dashed` only: draw this many offset duplicate frames (front carries the label). Mermaid:
-   * `id{label # stack=N}` with N ≥ 2.
+   * `resolver` only: draw this many offset duplicate frames (front carries the title). Mermaid:
+   * `id{title # stack=N}` with N ≥ 2.
    */
   stackDepth?: number
   /**

@@ -1,5 +1,5 @@
 /**
- * Diagram label pills: plain (solid fill) vs hatched (`hatched`). Record-style copy uses Marist
+ * Diagram pill nodes: plain (solid fill) vs hatched (`hatched`). Record-style copy uses Marist
  * by default; `typography="semimono"` matches roles / wallet lines (Semi-Mono + 0.05em tracking).
  */
 import { motion } from "motion/react"
@@ -9,7 +9,7 @@ import { DIAGRAM_FONTS } from "./theme"
 import { PathPulseRing } from "./PathPulseRing"
 
 interface Props {
-  label: string
+  title: string
   x: number
   y: number
   width: number
@@ -23,7 +23,7 @@ interface Props {
   hatched: boolean
   /** Marist (records) vs Semi-Mono (roles / wallets). */
   typography?: DiagramTypography
-  /** Mode-driven pill fill (plain labels). */
+  /** Mode-driven pill fill (plain pills). */
   surfaceFill?: string
   surfaceBorder?: string
   hatchBase?: string
@@ -45,8 +45,8 @@ interface Props {
   }
 }
 
-export function LabelNode({
-  label,
+export function PillNode({
+  title,
   x,
   y,
   width,
@@ -137,7 +137,7 @@ export function LabelNode({
           color,
         }}
       >
-        {label}
+        {title}
       </span>
     </motion.div>
   )

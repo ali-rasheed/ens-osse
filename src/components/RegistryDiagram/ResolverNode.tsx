@@ -1,9 +1,9 @@
 /**
- * Dashed “resolver” frame with corner sockets. Socket squares use a small radius to match
+ * Resolver frame with corner sockets. Socket squares use a small radius to match
  * Diagram System corner markers (e.g. 2px rounding).
  *
  * With `stackDepth` > 1, draws duplicate frames offset down-right via `DiagonalStack` (Mermaid
- * `id{label # stack=N}`); only the front layer shows the label.
+ * `id{title # stack=N}`); only the front layer shows the title.
  */
 import { motion } from "motion/react"
 import type { Variants } from "motion/react"
@@ -14,7 +14,7 @@ import { RESOLVER_STACK_LAYER_OFFSET } from "./layout"
 const SOCKET_CORNER_RADIUS = 2
 
 interface LayerProps {
-  label: string
+  title: string
   width: number
   height: number
   fontSize: number
@@ -23,8 +23,8 @@ interface LayerProps {
   borderRadius: number
   borderWidth: number
   color: string
-  /** Center label; defaults to `color` (stroke). */
-  labelColor?: string
+  /** Center title; defaults to `color` (stroke). */
+  titleColor?: string
   /** Solid fill inside dashed stroke (Diagram System). */
   surfaceFill: string
   socketColor: string
@@ -37,8 +37,8 @@ interface LayerProps {
   frameOnly: boolean
 }
 
-function DashedLayerFrame({
-  label,
+function ResolverLayerFrame({
+  title,
   width,
   height,
   fontSize,
@@ -47,7 +47,7 @@ function DashedLayerFrame({
   borderRadius,
   borderWidth,
   color,
-  labelColor,
+  titleColor,
   surfaceFill,
   socketColor,
   frameInset,
@@ -57,7 +57,7 @@ function DashedLayerFrame({
   dashGap,
   frameOnly,
 }: LayerProps) {
-  const textColor = labelColor ?? color
+  const textColor = titleColor ?? color
   const strokeInset = frameInset + borderWidth / 2
   const socketOffset = -socketSize / 2
   const socketMaxX = width - socketSize / 2
@@ -145,7 +145,7 @@ function DashedLayerFrame({
             whiteSpace: "nowrap",
           }}
         >
-          {label}
+          {title}
         </div>
       ) : null}
     </div>
@@ -153,7 +153,7 @@ function DashedLayerFrame({
 }
 
 interface Props {
-  label: string
+  title: string
   x: number
   y: number
   width: number
@@ -168,8 +168,8 @@ interface Props {
   color?: string
   /** Corner sockets; defaults to `color` when omitted. */
   socketColor?: string
-  /** Resolver center label; defaults to `color`. */
-  labelColor?: string
+  /** Resolver center title; defaults to `color`. */
+  titleColor?: string
   frameInset?: number
   radiusBonus?: number
   socketSize?: number
@@ -192,8 +192,8 @@ interface Props {
   }
 }
 
-export function DashedNode({
-  label,
+export function ResolverNode({
+  title,
   x,
   y,
   width,
@@ -207,7 +207,7 @@ export function DashedNode({
   borderWidth = 0.5,
   color = "#ffffff",
   socketColor,
-  labelColor,
+  titleColor,
   frameInset = 10,
   radiusBonus = 8,
   socketSize = 12,
@@ -225,7 +225,7 @@ export function DashedNode({
   const innerH = height - (depth - 1) * ox
 
   const layerProps: Omit<LayerProps, "frameOnly"> = {
-    label,
+    title,
     width: innerW,
     height: innerH,
     fontSize,
@@ -234,7 +234,7 @@ export function DashedNode({
     borderRadius,
     borderWidth,
     color,
-    labelColor,
+    titleColor,
     surfaceFill,
     socketColor: socketFill,
     frameInset,
@@ -246,11 +246,11 @@ export function DashedNode({
 
   const content =
     depth <= 1 ? (
-      <DashedLayerFrame {...layerProps} frameOnly={false} />
+      <ResolverLayerFrame {...layerProps} frameOnly={false} />
     ) : (
       <DiagonalStack offsetX={ox} offsetY={ox}>
         {Array.from({ length: depth }, (_, i) => (
-          <DashedLayerFrame key={i} {...layerProps} frameOnly={i > 0} />
+          <ResolverLayerFrame key={i} {...layerProps} frameOnly={i > 0} />
         ))}
       </DiagonalStack>
     )

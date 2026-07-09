@@ -100,16 +100,16 @@ function registryOuterBreadth(node: NodeData, borderWidth: number): number {
 }
 
 function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: number } {
-  const { type, label, slots, children, bodyLines } = node
-  if (type === "label" || type === "labelHatched") {
-    const w = label.length * CHAR_RATIO.label * opts.labelFontSize + opts.labelPaddingH * 2
+  const { type, title, slots, children, bodyLines } = node
+  if (type === "pill") {
+    const w = title.length * CHAR_RATIO.label * opts.labelFontSize + opts.labelPaddingH * 2
     const h = opts.labelFontSize * 1.4 + opts.labelPaddingV * 2
     return { width: Math.max(32, w), height: h }
   }
-  if (type === "dashed") {
+  if (type === "resolver") {
     const shell = 2 * (opts.resolverBorderWidth + opts.resolverSocketOverhang)
     const w =
-      label.length * CHAR_RATIO.dashed * opts.resolverFontSize +
+      title.length * CHAR_RATIO.dashed * opts.resolverFontSize +
       opts.resolverPaddingH * 2 +
       shell
     const h = opts.resolverFontSize * 1.4 + opts.resolverPaddingV * 2 + shell
@@ -140,7 +140,7 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
       colH += b.height
       if (i < activeChildren.length - 1) colH += REGISTRY_NESTED_CHILD_GAP
     }
-    const headerTextW = label.length * CHAR_RATIO.registry * opts.fontSize
+    const headerTextW = title.length * CHAR_RATIO.registry * opts.fontSize
     const headerLineH = opts.fontSize * 1.4
     const innerContentW = Math.max(headerTextW, colW) + opts.paddingH * 2
     const innerContentH =
@@ -155,7 +155,7 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
   const slotTextStack = activeSlots.length > 0 && Boolean(opts.insideRegistryChildrenTree)
 
   if (slotTextStack) {
-    const headerTextW = label.length * CHAR_RATIO.registry * opts.fontSize
+    const headerTextW = title.length * CHAR_RATIO.registry * opts.fontSize
     const headerLineH = opts.fontSize * 1.4
     const lineH = opts.labelFontSize * 1.4
     let maxSlotW = 0
@@ -180,7 +180,7 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
   if (!activeSlots.length) {
     const activeBody = bodyLines?.filter(Boolean) ?? []
     if (activeBody.length > 0) {
-      const headerTextW = label.length * CHAR_RATIO.registry * opts.fontSize
+      const headerTextW = title.length * CHAR_RATIO.registry * opts.fontSize
       const headerLineH = opts.fontSize * 1.4
       const lineH = opts.labelFontSize * 1.4
       let maxBodyW = 0
@@ -202,12 +202,12 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
       }
     }
     const w =
-      label.length * CHAR_RATIO.registry * opts.fontSize + opts.paddingH * 2 + frameBreadth
+      title.length * CHAR_RATIO.registry * opts.fontSize + opts.paddingH * 2 + frameBreadth
     const h = opts.fontSize * 1.4 + opts.paddingV * 2 + frameBreadth
     return { width: Math.max(minW, w), height: h }
   }
 
-  const headerTextW = label.length * CHAR_RATIO.registry * opts.fontSize
+  const headerTextW = title.length * CHAR_RATIO.registry * opts.fontSize
   const headerLineH = opts.fontSize * 1.4
   const slotRowH = opts.labelFontSize * 1.4 + opts.labelPaddingV * 2
 
@@ -754,7 +754,7 @@ export function computeLayout(
 
   for (const node of nodes) {
     const { width, height } = nodeBox(node, boxOpts)
-    g.setNode(node.id, { label: node.label, width, height })
+    g.setNode(node.id, { label: node.title, width, height })
   }
 
   for (const edge of edges) {
