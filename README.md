@@ -2,7 +2,7 @@
 
 Interactive **ENS / Diagram System** registry diagrams: React + Dagre layout, theme modes (light / dark / protocol), DialKit tuning, Mermaid-like graph source, PNG export, and MDX embed snippet.
 
-**License:** [MIT](LICENSE). **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md). **Devrel / embed / release checklist:** [docs/devrel.md](./docs/devrel.md). **Live demo:** _TBD — set in README after deploy (see devrel doc)._
+**License:** [MIT](LICENSE). **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md). **Using Ossë:** [docs/docs.md](./docs/docs.md). **Devrel / embed / release checklist:** [docs/devrel.md](./docs/devrel.md). **Live demo:** _TBD — set in README after deploy (see devrel doc)._
 
 ## Mermaid syntax (source of truth)
 
@@ -15,9 +15,13 @@ The sidebar editor’s expandable reference under the graph input is generated f
 Summary:
 
 - **Registry** `id[label]` (double border default), optional hatched slots `id[a|b|c]`, optional ` # frame=single` inside brackets.
+- **Multiline** `id["name<br/>owner: 0x…"]` — title + body lines; `(delegated)` lines render hatched.
 - **Label** `id(label)`, hatched `id((label))`, **resolver** `id{label}`.
-- **Edges** `a --> b` with optional `# fromSlot=0 toSlot=1 route=vhv`.
+- **Links (Mermaid):** `-->`, `---`, `-.->`, `==>`, `-- text -->`, `-. text .->`, chained `A --> B & C`.
+- **Caption:** `%% caption: …` above `graph TD`.
+- **ENS edge meta:** `# fromSlot=0 route=vhv` after the target node.
 - **Nested registries** (frame-with-children) are **JSON / `NodeData.children` only**, not Mermaid.
+- **Visual tuning:** [`src/components/RegistryDiagram/linkStyles.ts`](src/components/RegistryDiagram/linkStyles.ts).
 
 ## Scripts
 
@@ -33,6 +37,7 @@ npm run devrel:revisit   # reminder: open docs/devrel.md
 
 | Path | Role |
 |------|------|
+| `docs/docs.md` | User guide — app tour, DialKit, export, embed |
 | `docs/devrel.md` | Devrel checklist, embed notes, live URL reminder |
 | `docs/packaging.md` | Contributor-facing npm library roadmap summary |
 | `docs/mermaid-patterns.md` | Canonical Mermaid subset documentation |

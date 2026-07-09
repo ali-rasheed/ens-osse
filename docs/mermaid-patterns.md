@@ -66,17 +66,31 @@ If an edge mentions an id that never appears on its own line or as an inline nod
 
 ## Edges
 
-```text
-fromId --> toId
-```
+Mermaid-compatible **link tokens** (ENS node shapes unchanged):
 
-You may use **`->`** instead of **`-->`** (same meaning).
+| Syntax | Style | Arrow |
+|--------|-------|-------|
+| `A --> B` or `A -> B` | solid | yes |
+| `A --- B` | open | no |
+| `A -.-> B` | dotted | yes |
+| `A ==> B` | thick | yes |
+| `A -- text --> B` | solid + label | yes |
+| `A -. text .-> B` | dotted + label | yes |
+| `A --> \|text\| B` | solid + label | yes |
+
+Dotted edges with label `alias` use dedicated alias routing (see [Automatic layout behavior](#automatic-layout-behavior)).
+
+**Chained edges:** `A --> B & C & D` expands to multiple edges from `A`.
+
+You may use **`->`** instead of **`-->`** on solid links.
 
 Endpoints may include inline node definitions (same shapes as above). A resolver or registry node may span **multiple lines** if `{ … }` braces are unbalanced on the first line (e.g. `# stack=3` on the next line inside `{…}`).
 
-### Edge metadata (optional)
+Optional Mermaid edge id prefix (ignored): `e1@-.->`.
 
-Append **space-hash-space** and tokens (space-separated) on the **same line**:
+### Edge metadata (ENS extension)
+
+Append **space-hash-space** and tokens (space-separated) on the **same line** after the target node:
 
 | Token | Meaning |
 |-------|---------|
@@ -90,7 +104,85 @@ Append **space-hash-space** and tokens (space-separated) on the **same line**:
 ```text
 ethR --> workemon # fromSlot=0
 workemon --> walletR # fromSlot=1 route=vhv
+dev -. alias .-> prod # route=hv
 ```
+
+---
+
+## Automatic layout behavior
+
+Dagre assigns node ranks and rough edge paths; ENS post-processes polylines before render.
+
+### Edge classes and default routers
+
+| Class | Router | When it applies |
+|-------|--------|-----------------|
+| **Hierarchy solid** | `buildHierarchyEdgePolyline` | Solid `-->` parent → child (target rank below source), no `fromSlot` / `toSlot` |
+| **Alias / dotted lateral** | `buildAliasEdgePolyline` | `-.->` or edge label `alias` |
+| **Slot-anchored** | `applySlotAnchors` + orthogonal pass | `fromSlot=N` / `toSlot=N` on a registry with a hatched slot row |
+| **Default** | Dagre points + `orthogonalizePolyline` | Everything else |
+
+### Default attachment ports
+
+| Relationship | Tail | Head |
+|--------------|------|------|
+| Parent → child (hierarchy router) | Source bottom-center | Target top-center |
+| Same-rank or sibling alias | Source bottom-center | Target top-center (lane below nodes) |
+| Cross-rank alias | Source bottom-center | Target side-center (dedicated lane) |
+| Slot delegation | Slot bottom-center | Per target semantics |
+
+Hierarchy paths use **vertical-first (`vhv`)** fan-out: drop from the parent, jog horizontally at mid-Y, drop into each child. Same-rank alias edges ignore `route=` and always use the alias router.
+
+### Token overrides
+
+| Token | Honored by | Notes |
+|-------|------------|-------|
+| `fromSlot` / `toSlot` | Slot anchors | Bypasses hierarchy router on that end |
+| `route=hv` | Hierarchy + default orthogonal pass | Horizontal-first elbow |
+| `route=vhv` | Hierarchy + default orthogonal pass | Vertical → horizontal → vertical |
+| `route=*` on alias edges | **Ignored** | Alias router always wins |
+
+### Spacing knobs (UI)
+
+**Layout → ranksep / nodesep** in the left DialKit panel control Dagre rank and sibling spacing. **Edges → cornerRadius** fillets 90° bends. See the [user guide](./docs.md) for a full app tour.
+
+---
+
+## Multiline labels (Mermaid `<br/>`)
+
+Registry (and label) text may span lines using Mermaid line breaks:
+
+```text
+prod["prod.workemon.eth<br/>addr: 0x...<br/>avatar: ipfs://..."]
+workemon["workemon.eth<br/>owner: 0xAlice"]
+```
+
+- First line → Semi-Mono **title** (registry name).
+- Subsequent lines → Marist **body** stack below the title.
+- Lines containing `(delegated)` render as **hatched** pills (see [`linkStyles.ts`](../src/components/RegistryDiagram/linkStyles.ts)).
+- Lines starting with `owner:` use Semi-Mono in the body stack.
+
+Quoted bracket bodies are supported when labels contain `|` or `<br/>`.
+
+---
+
+## Caption (prose below diagram)
+
+```text
+%% caption: Set your own rules for how your names are managed…
+flowchart TD
+  …
+```
+
+Extracted into `ParsedGraph.caption` and shown below the diagram in the demo app. Included in docs embed JSON when present.
+
+---
+
+## Visual tuning
+
+Link stroke patterns, delegation marker, and edge label chip sizing: [`src/components/RegistryDiagram/linkStyles.ts`](../src/components/RegistryDiagram/linkStyles.ts).
+
+**Note:** Node shapes in this tool are **ENS-specific** (`{…}` = resolver, not Mermaid diamond). Pasting sources into [Mermaid Live Editor](https://mermaid.live) will not render identically.
 
 ---
 
@@ -106,6 +198,9 @@ The demo app’s **Template → ENS v2 registry column** loads minimal Mermaid (
 
 Built-in presets (sidebar **Template** dropdown) are defined in `mermaidTemplates.ts`, including:
 
+- **ENS v2 — alias to sibling** — parent tree + `-. alias .->` dotted edges; records via `<br/>`.
+- **ENS v2 — workemon delegation tree** — `workemon.eth` → `app` / `brand` with per-record `(delegated)` body lines (hatched).
+- **ENS v2 — flexible registry** — `%% caption:` marketing prose below the diagram.
 - **ENS v2 registry column** (`nested-column`) — minimal `Registry → Resolvers # stack=3` Mermaid; reference thumbnail in `/public/templates/`; demo merges JSON children for `registry-root` (see Nested registries above).
 - **ENS registry tree** — classic flat `<root> → eth → workemon.eth` layout with resolver branch (reference thumbnail in `/public/templates/`).
 - **Minimal** — two nodes, one edge.
@@ -114,7 +209,7 @@ Built-in presets (sidebar **Template** dropdown) are defined in `mermaidTemplate
 
 ## Serialize / round-trip
 
-[`serializeMermaid`](../src/lib/mermaid.ts) emits `graph TD`, registry brackets with optional ` # frame=single`, and edge lines with `# fromSlot=…` etc. Nested `children` are **not** written back to Mermaid.
+[`serializeMermaid`](../src/lib/mermaid.ts) emits `graph TD`, optional `%% caption:`, multiline quoted registry labels with `<br/>`, Mermaid link tokens (`-. label .->` for dotted), and ENS edge metadata `# fromSlot=…` etc. Nested `children` are **not** written back to Mermaid.
 
 ---
 

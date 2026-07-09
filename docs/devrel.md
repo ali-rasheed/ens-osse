@@ -14,12 +14,13 @@ Payload schema version: **`ens-registry-diagram/v1`**.
 
 - Snippet builder (copy from the app UI): logic in [`src/lib/docsEmbed.ts`](../src/lib/docsEmbed.ts) (`buildDocsEmbedSnippet`, `DocsEmbedPayload`).
 - **ENS v2 registry column (`nested-column`):** embed is Mermaid-only. The live demo also runs [`mergeNestedColumnDemoNodes`](../src/lib/nestedColumnDemoData.ts); docs consumers need that merge or raw `NodeData[]` to match the full nested layout.
-- Until a shared `<RegistryDiagramEmbed />` exists in your docs app: store the JSON payload or pass `mermaid` + `mode` props to your own wrapper that renders this repo’s diagram component.
+- Until a shared `<RegistryDiagramEmbed />` exists in your docs app: store the JSON payload or pass `mermaid` + `mode` (+ optional `caption`) props to your own wrapper that renders this repo’s diagram component.
 
 ## Revisit checklist
 
 - [ ] [`LICENSE`](../LICENSE) present and correct for your org (swap text if not MIT).
 - [ ] [`README.md`](../README.md) lists **Live demo** URL when known.
+- [ ] [`docs/docs.md`](docs.md) matches current app layout (left DialKit, right editor, three-column shell).
 - [ ] [`docs/mermaid-patterns.md`](mermaid-patterns.md) matches [`src/lib/mermaid.ts`](../src/lib/mermaid.ts) behavior.
 - [ ] `npm run build` succeeds (local and CI).
 - [ ] Embed story still accurate for consumers ([`docsEmbed.ts`](../src/lib/docsEmbed.ts), this file).
