@@ -1,4 +1,7 @@
 import type { DiagramMode, DiagramTypography } from "./theme"
+import type { LinkStyle } from "./linkStyles"
+
+export type { LinkStyle } from "./linkStyles"
 
 /** `label` = solid pill (Figma default); `labelHatched` = cross-hatch fill (Figma variant 2). */
 export type NodeType = "registry" | "label" | "labelHatched" | "dashed"
@@ -30,6 +33,10 @@ export interface NodeData {
    * `id{label # stack=N}` with N ≥ 2.
    */
   stackDepth?: number
+  /**
+   * `registry` only: extra lines below the title from Mermaid `<br/>` (owner, records, delegation copy).
+   */
+  bodyLines?: string[]
 }
 
 /** Orthogonal routing between non–axis-aligned polyline joints from Dagre. */
@@ -54,6 +61,10 @@ export interface EdgeData {
    * so tails leave slot ports downward before jogging; others default to `hv`.
    */
   orthogonalStyle?: EdgeOrthogonalStyle
+  /** Mermaid link style: `-->`, `-.->`, `---`, `==>`. Default `solid`. */
+  linkStyle?: LinkStyle
+  /** Mid-path label from Mermaid `-- text -->`, `-. text .->`, or `-->|text|`. */
+  label?: string
 }
 
 /** Passed to `RegistryDiagram`; defaults and variants: `animationConfig.ts`. */
@@ -139,6 +150,12 @@ export interface DiagramConfig {
   cornerRadius?: number
   dotRadius?: number
   edgeColor?: string
+  /** Edge label chip fill; defaults to labelSurfaceFill. */
+  edgeLabelFill?: string
+  /** Edge label chip border; defaults to labelSurfaceBorder. */
+  edgeLabelBorder?: string
+  /** Edge label text color; defaults to labelColor. */
+  edgeLabelColor?: string
   ranksep?: number
   nodesep?: number
 }

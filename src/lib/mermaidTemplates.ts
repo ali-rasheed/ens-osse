@@ -46,7 +46,60 @@ export const CLASSIC_ENS_TREE_MERMAID = `graph TD
   workemon --> delegateR # fromSlot=0
   workemon --> walletR # fromSlot=1`
 
+export const ENSV2_ALIAS_SIBLINGS_MERMAID = `flowchart TD
+  workemon["workemon.eth<br/>owner: 0xAlice"]
+  prod["prod.workemon.eth<br/>addr: 0x...<br/>avatar: ipfs://..."]
+  dev[dev.workemon.eth]
+  staging[staging.workemon.eth]
+  workemon --> prod & dev & staging
+  dev -. alias .-> prod
+  staging -. alias .-> prod`
+
+/**
+ * ENS v2 per-record delegation on subnames (workemon.eth → app / brand).
+ * Comment block mirrors the reference tree; Mermaid `<br/>` body lines render inside each subname.
+ */
+export const ENSV2_DELEGATED_RECORDS_MERMAID = `flowchart TD
+  %% Diagram:
+  %% workemon.eth (owner: 0xAlice)
+  %% ├── app.workemon.eth
+  %% │   ├── addr → 0xDev (delegated)
+  %% │   └── text:url → 0xBot (delegated)
+  %% └── brand.workemon.eth
+  %%     ├── avatar → 0xDesigner (delegated)
+  %%     └── text:description → 0xDesigner (delegated)
+  workemon["workemon.eth<br/>owner: 0xAlice"]
+  app["app.workemon.eth<br/>addr → 0xDev (delegated)<br/>text:url → 0xBot (delegated)"]
+  brand["brand.workemon.eth<br/>avatar → 0xDesigner (delegated)<br/>text:description → 0xDesigner (delegated)"]
+  workemon --> app & brand`
+
+export const ENSV2_FLEXIBLE_REGISTRY_MERMAID = `%% caption: Set your own rules for how your names are managed with the autonomy to organize your digital presence exactly how you need. This shift to a flexible registry ensures your identity remains adaptable, allowing you to structure =
+flowchart TD
+  workemon["workemon.eth<br/>owner: 0xAlice"]
+  app[app.workemon.eth]
+  workemon --> app`
+
 export const MERMAID_TEMPLATES: MermaidTemplate[] = [
+  {
+    id: "ensv2-delegated-records",
+    title: "ENS v2 — workemon delegation tree",
+    description:
+      "workemon.eth → app / brand with per-record delegation (addr, text:url, avatar). (delegated) lines render as hatched pills.",
+    source: ENSV2_DELEGATED_RECORDS_MERMAID,
+  },
+  {
+    id: "ensv2-alias-siblings",
+    title: "ENS v2 — alias to sibling",
+    description:
+      "Parent tree plus Mermaid dotted alias edges (dev/staging → prod). Records on prod via multiline <br/> labels.",
+    source: ENSV2_ALIAS_SIBLINGS_MERMAID,
+  },
+  {
+    id: "ensv2-flexible-registry",
+    title: "ENS v2 — flexible registry",
+    description: "Marketing caption via %% caption: directive below the diagram.",
+    source: ENSV2_FLEXIBLE_REGISTRY_MERMAID,
+  },
   {
     id: "nested-column",
     title: "ENS v2 registry column",
@@ -80,7 +133,7 @@ export function normalizeMermaid(src: string): string {
   return src
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l.length > 0)
+    .filter((l) => l.length > 0 && !/^%%\s*caption/i.test(l))
     .join("\n")
 }
 

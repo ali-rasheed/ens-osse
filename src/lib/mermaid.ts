@@ -3,16 +3,20 @@ import type {
   EdgeData,
   NodeType,
 } from "../components/RegistryDiagram/types"
+import type { LinkStyle } from "../components/RegistryDiagram/linkStyles"
 
 /* Double-paren first so `((hatched))` does not match as a single `(`. */
 const NODE_RE =
   /^([\w-]+)(?:\[([^\]]*)\]|\(\(([^)]*)\)\)|\(([^)]*)\)|\{([^}]*)\})?$/
-/** Mermaid commonly uses `-->`; `->` is accepted as an alias. */
-const EDGE_RE = /^(.+?)\s*(?:-->|->)\s*(.+)$/
 
 interface Endpoint {
   id: string
   node?: NodeData
+}
+
+interface ParsedLink {
+  linkStyle: LinkStyle
+  label?: string
 }
 
 /**
@@ -34,6 +38,32 @@ function splitLabelAndHashMeta(body: string): { main: string; meta: string } {
     main: s.slice(0, lastIdx).trim(),
     meta: s.slice(lastIdx + lastLen).trim(),
   }
+}
+
+/** Split Mermaid `<br/>` / `<br>` multiline text into title + body lines. */
+function splitMultilineLabel(raw: string): { label: string; bodyLines?: string[] } {
+  const normalized = raw.replace(/<br\s*\/?>/gi, "\n")
+  const lines = normalized
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (lines.length <= 1) {
+    return { label: lines[0] ?? raw.trim() }
+  }
+  const [label, ...bodyLines] = lines
+  return { label, bodyLines }
+}
+
+/** Strip optional outer quotes from Mermaid `id["text"]` bracket bodies. */
+function unquoteBracketBody(body: string): string {
+  const s = body.trim()
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    return s.slice(1, -1)
+  }
+  return s
 }
 
 /** Unclosed `{` on a line: merge following lines until braces balance (multiline `id{…}`). */
@@ -77,24 +107,38 @@ function parseDashedBrace(body: string): Omit<NodeData, "id"> {
       if (n >= 2 && n <= 24) stackDepth = n
     }
   }
-  const base: Omit<NodeData, "id"> = { label: main.replace(/\s+/g, " ").trim(), type: "dashed" }
+  const { label, bodyLines } = splitMultilineLabel(main.replace(/\s+/g, " ").trim())
+  const base: Omit<NodeData, "id"> = { label, type: "dashed" }
+  if (bodyLines?.length) return { ...base, bodyLines }
   if (stackDepth != null) return { ...base, stackDepth }
   return base
 }
 
 function parseRegistryBracket(body: string): NodeData {
   const { main: mainRaw, meta } = splitLabelAndHashMeta(body)
-  const main = mainRaw.replace(/\s+/g, " ").trim()
-  const parts = main.split("|").map((p) => p.trim())
-  const label = parts[0] ?? ""
-  const slots = parts.slice(1).filter(Boolean)
+  const main = unquoteBracketBody(mainRaw)
+  const hasPipeSlots = !/<br\s*\/?>/i.test(main) && main.includes("|")
+  const parts = hasPipeSlots
+    ? main.split("|").map((p) => p.trim())
+    : [main.trim()]
+  const multiline = splitMultilineLabel(hasPipeSlots ? (parts[0] ?? "") : main.trim())
+  const label = hasPipeSlots ? (parts[0] ?? multiline.label) : multiline.label
+  const slots = hasPipeSlots ? parts.slice(1).filter(Boolean) : undefined
   let registryFrame: NodeData["registryFrame"]
   for (const bit of meta.split(/\s+/)) {
     if (bit === "frame=single" || bit === "border=single") registryFrame = "single"
   }
   const base: NodeData = { id: "", label, type: "registry", registryFrame }
-  if (slots.length) return { ...base, slots }
+  if (multiline.bodyLines?.length) {
+    return { ...base, bodyLines: multiline.bodyLines, ...(slots?.length ? { slots } : {}) }
+  }
+  if (slots?.length) return { ...base, slots }
   return base
+}
+
+function parseLabelText(text: string): Pick<NodeData, "label" | "bodyLines"> {
+  const { label, bodyLines } = splitMultilineLabel(text.trim())
+  return bodyLines?.length ? { label, bodyLines } : { label }
 }
 
 /** Optional tail on edge lines: `a --> b # fromSlot=0 toSlot=1 route=vhv` */
@@ -134,14 +178,124 @@ function splitEdgeRhs(rhs: string): { endpoint: string; meta: string } {
   return { endpoint: rhs.slice(0, m.index).trim(), meta }
 }
 
+/**
+ * Parse Mermaid-compatible link tokens between two endpoints.
+ * Supports: `-->`, `---`, `-.->`, `==>`, `-- text -->`, `-. text .->`, `-->|text|`, `->`.
+ */
+function parseMermaidLink(middle: string): ParsedLink | null {
+  const s = middle.trim()
+  // Pipe label: -->|text|
+  const pipe = /^(--?\|)([^|]+)\|\>?\>?$/.exec(s)
+  if (pipe) {
+    return { linkStyle: "solid", label: pipe[2].trim() }
+  }
+  // Dotted with text: -. text .->
+  const dottedText = /^-\.\s*(.+?)\s*\.->?$/.exec(s)
+  if (dottedText) {
+    return { linkStyle: "dotted", label: dottedText[1].trim() }
+  }
+  // Solid with text: -- text -->
+  const solidText = /^--\s*(.+?)\s*-->?$/.exec(s)
+  if (solidText) {
+    return { linkStyle: "solid", label: solidText[1].trim() }
+  }
+  // Dotted: -.-> or .->
+  if (/^-\.?\.->?$/.test(s) || /^-\.->?$/.test(s)) {
+    return { linkStyle: "dotted" }
+  }
+  // Thick: ==>
+  if (/^==>?$/.test(s)) {
+    return { linkStyle: "thick" }
+  }
+  // Open: ---
+  if (/^---$/.test(s)) {
+    return { linkStyle: "open" }
+  }
+  // Solid: --> or ->
+  if (/^-->?$/.test(s) || /^->$/.test(s)) {
+    return { linkStyle: "solid" }
+  }
+  return null
+}
+
+/** Strip optional Mermaid edge id prefix: `e1@-.->` */
+function stripEdgeIdPrefix(line: string): string {
+  return line.replace(/^([\w-]+)@/, "")
+}
+
+/**
+ * Expand Mermaid chained edges: `A --> B & C & D` → separate edge lines.
+ */
+function expandChainedEdges(line: string): string[] {
+  const stripped = stripEdgeIdPrefix(line.trim())
+  const chainMatch = /^(.+?\s+(?:--?\|[^|]+\|>?|-\.\s*.+?\s*\.->|--\s*.+?\s*-->|-\.->?|==>?|--?>?|---)\s+)(.+)$/i.exec(
+    stripped
+  )
+  if (!chainMatch) return [line]
+
+  const lhsAndLink = chainMatch[1]
+  const rhs = chainMatch[2].trim()
+  if (!rhs.includes("&")) return [line]
+
+  const targets = rhs.split("&").map((t) => t.trim()).filter(Boolean)
+  if (targets.length <= 1) return [line]
+
+  return targets.map((target) => `${lhsAndLink}${target}`.trim())
+}
+
+/** Try to split a line into lhs, link middle, rhs (+ optional ENS meta). */
+function parseEdgeLine(line: string): {
+  from: Endpoint
+  to: Endpoint
+  link: ParsedLink
+  anchors: Pick<EdgeData, "fromSlotIndex" | "toSlotIndex" | "orthogonalStyle">
+} | null {
+  const stripped = stripEdgeIdPrefix(line.trim())
+
+  // Find link token in the line — try patterns from most specific to least
+  const patterns: Array<{
+    re: RegExp
+    linkGroup: number
+  }> = [
+    { re: /^(.+?)\s+(-\.\s*.+?\s*\.->?)\s+(.+)$/i, linkGroup: 2 },
+    { re: /^(.+?)\s+(--\s*.+?\s*-->?)\s+(.+)$/i, linkGroup: 2 },
+    { re: /^(.+?)\s+(--?\|[^|]+\|>?)\s+(.+)$/i, linkGroup: 2 },
+    { re: /^(.+?)\s+(-\.->?)\s+(.+)$/i, linkGroup: 2 },
+    { re: /^(.+?)\s+(==>?)\s+(.+)$/i, linkGroup: 2 },
+    { re: /^(.+?)\s+(---)\s+(.+)$/i, linkGroup: 2 },
+    { re: /^(.+?)\s+(-->?)\s+(.+)$/i, linkGroup: 2 },
+    { re: /^(.+?)\s+(->)\s+(.+)$/i, linkGroup: 2 },
+  ]
+
+  for (const { re, linkGroup } of patterns) {
+    const m = re.exec(stripped)
+    if (!m) continue
+    const linkMiddle = m[linkGroup]
+    const parsed = parseMermaidLink(linkMiddle)
+    if (!parsed) continue
+    const { endpoint: rhsEp, meta } = splitEdgeRhs(m[3])
+    const from = parseEndpoint(m[1].trim())
+    const to = parseEndpoint(rhsEp)
+    const anchors = meta ? parseEdgeAnchorMeta(meta) : {}
+    return { from, to, link: parsed, anchors }
+  }
+  return null
+}
+
 function parseEndpoint(raw: string): Endpoint {
   const s = raw.trim()
   const m = NODE_RE.exec(s)
   if (!m) throw new Error(`Cannot parse node "${s}"`)
   const id = m[1]
   if (m[2] !== undefined) return { id, node: { ...parseRegistryBracket(m[2]), id } }
-  if (m[3] !== undefined) return { id, node: { id, label: m[3], type: "labelHatched" } }
-  if (m[4] !== undefined) return { id, node: { id, label: m[4], type: "label" } }
+  if (m[3] !== undefined) {
+    const parsed = parseLabelText(m[3])
+    return { id, node: { id, ...parsed, type: "labelHatched" } }
+  }
+  if (m[4] !== undefined) {
+    const parsed = parseLabelText(m[4])
+    return { id, node: { id, ...parsed, type: "label" } }
+  }
   if (m[5] !== undefined) return { id, node: { ...parseDashedBrace(m[5]), id } }
   return { id }
 }
@@ -149,40 +303,65 @@ function parseEndpoint(raw: string): Endpoint {
 export interface ParsedGraph {
   nodes: NodeData[]
   edges: EdgeData[]
+  caption?: string
   error?: string
 }
+
+const CAPTION_RE = /^%%\s*caption:?\s*(.+)$/i
 
 /**
  * Parser for the project’s Mermaid subset. Canonical spec: `docs/mermaid-patterns.md`.
  *
  * Nested `registry.children` trees are not expressible in this syntax; use JSON `NodeData[]`.
- * Single-bordered registry: ` # frame=single` inside brackets (after slots), e.g.
- * `id[label|slot # frame=single]`.
- * Stacked resolver: `id{label # stack=N}` with 2 ≤ N ≤ 24 (offset duplicate frames).
- * Trailing ` # …` on an edge RHS is edge metadata only when it uses `fromSlot` / `toSlot` / `route`
- * (so `… --> id{label # stack=N}` keeps the whole target node on the RHS).
+ * Mermaid-compatible links: `-->`, `---`, `-.->`, `==>`, `-- text -->`, `-. text .->`, `-->|text|`.
+ * Multiline labels: `<br/>` inside brackets or quotes.
  */
 export function parseMermaid(src: string): ParsedGraph {
   const nodeMap = new Map<string, NodeData>()
   const edges: EdgeData[] = []
+  let caption: string | undefined
   try {
+    const rawLines = src
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("//"))
+
+    for (const line of rawLines) {
+      const cap = CAPTION_RE.exec(line)
+      if (cap) {
+        caption = cap[1].trim()
+        continue
+      }
+    }
+
     const lines = mergeLinesWithOpenBraces(
-      src
-        .split("\n")
-        .map((l) => l.trim())
-        .filter((l) => l && !l.startsWith("//") && !l.startsWith("%%"))
+      rawLines.filter((l) => !CAPTION_RE.test(l) && !l.startsWith("%%"))
     )
+
+    const expandedLines: string[] = []
     for (const line of lines) {
+      if (/^(graph|flowchart)\b/i.test(line)) {
+        expandedLines.push(line)
+        continue
+      }
+      expandedLines.push(...expandChainedEdges(line))
+    }
+
+    for (const line of expandedLines) {
       if (/^(graph|flowchart)\b/i.test(line)) continue
-      const em = EDGE_RE.exec(line)
-      if (em) {
-        const a = parseEndpoint(em[1].trim())
-        const { endpoint: rhsEp, meta } = splitEdgeRhs(em[2])
-        const b = parseEndpoint(rhsEp)
+
+      const edge = parseEdgeLine(line)
+      if (edge) {
+        const { from: a, to: b, link, anchors } = edge
         if (a.node && !nodeMap.has(a.id)) nodeMap.set(a.id, a.node)
         if (b.node && !nodeMap.has(b.id)) nodeMap.set(b.id, b.node)
-        const anchors = meta ? parseEdgeAnchorMeta(meta) : {}
-        edges.push({ from: a.id, to: b.id, ...anchors })
+        edges.push({
+          from: a.id,
+          to: b.id,
+          linkStyle: link.linkStyle,
+          ...(link.label ? { label: link.label } : {}),
+          ...anchors,
+        })
       } else {
         const ep = parseEndpoint(line)
         if (ep.node && !nodeMap.has(ep.id)) nodeMap.set(ep.id, ep.node)
@@ -193,7 +372,7 @@ export function parseMermaid(src: string): ParsedGraph {
       if (!nodeMap.has(e.from)) nodeMap.set(e.from, { id: e.from, label: e.from, type: "registry" })
       if (!nodeMap.has(e.to)) nodeMap.set(e.to, { id: e.to, label: e.to, type: "registry" })
     }
-    return { nodes: Array.from(nodeMap.values()), edges }
+    return { nodes: Array.from(nodeMap.values()), edges, caption }
   } catch (err) {
     return {
       nodes: [],
@@ -210,10 +389,34 @@ const BRACKETS: Record<NodeType, readonly [string, string]> = {
   dashed: ["{", "}"],
 }
 
-export function serializeMermaid(nodes: NodeData[], edges: EdgeData[]): string {
+function formatNodeLabel(n: NodeData): string {
+  const lines = n.bodyLines?.length ? [n.label, ...n.bodyLines] : [n.label]
+  const text = lines.join("<br/>")
+  return text.includes("|") || text.includes("<br") ? `"${text}"` : text
+}
+
+function serializeLink(e: EdgeData): string {
+  const style = e.linkStyle ?? "solid"
+  const lbl = e.label?.trim()
+  if (style === "dotted") {
+    return lbl ? `-. ${lbl} .->` : "-.->"
+  }
+  if (style === "open") return "---"
+  if (style === "thick") return "==>"
+  if (lbl) return `-- ${lbl} -->`
+  return "-->"
+}
+
+export function serializeMermaid(
+  nodes: NodeData[],
+  edges: EdgeData[],
+  caption?: string
+): string {
   const nodeMap = new Map(nodes.map((n) => [n.id, n]))
   const declared = new Set<string>()
-  const out = ["graph TD"]
+  const out: string[] = []
+  if (caption?.trim()) out.push(`%% caption: ${caption.trim()}`)
+  out.push("graph TD")
   const decl = (id: string) => {
     if (declared.has(id)) return id
     declared.add(id)
@@ -225,14 +428,17 @@ export function serializeMermaid(nodes: NodeData[], edges: EdgeData[]): string {
       return `${id}${open}${[n.label, ...n.slots].join("|")}${singleSuffix}${close}`
     }
     if (n.type === "registry") {
-      return `${id}${open}${n.label}${singleSuffix}${close}`
+      const body = n.bodyLines?.length ? formatNodeLabel(n) : n.label
+      return `${id}${open}${body}${singleSuffix}${close}`
     }
     if (n.type === "dashed") {
       const stack =
         n.stackDepth != null && n.stackDepth >= 2 ? ` # stack=${n.stackDepth}` : ""
-      return `${id}${open}${n.label}${stack}${close}`
+      const body = n.bodyLines?.length ? formatNodeLabel(n) : n.label
+      return `${id}${open}${body}${stack}${close}`
     }
-    return `${id}${open}${n.label}${close}`
+    const body = n.bodyLines?.length ? formatNodeLabel(n) : n.label
+    return `${id}${open}${body}${close}`
   }
   const edgeAnchorSuffix = (e: EdgeData): string => {
     const bits: string[] = []
@@ -243,7 +449,7 @@ export function serializeMermaid(nodes: NodeData[], edges: EdgeData[]): string {
   }
 
   for (const e of edges) {
-    out.push(`  ${decl(e.from)} --> ${decl(e.to)}${edgeAnchorSuffix(e)}`)
+    out.push(`  ${decl(e.from)} ${serializeLink(e)} ${decl(e.to)}${edgeAnchorSuffix(e)}`)
   }
   // Any nodes that aren't on an edge
   for (const n of nodes) {
