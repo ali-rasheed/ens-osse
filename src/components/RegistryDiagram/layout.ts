@@ -10,6 +10,7 @@
  * so the arrow meets the frame on-axis (skipped when `toSlotIndex` pins the head to a slot).
  */
 import dagre from "dagre"
+import { ALIAS_ROUTING, isAliasEdge, isAliasRouteEdge } from "./linkStyles"
 import type {
   NodeData,
   EdgeData,
@@ -99,7 +100,7 @@ function registryOuterBreadth(node: NodeData, borderWidth: number): number {
 }
 
 function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: number } {
-  const { type, label, slots, children } = node
+  const { type, label, slots, children, bodyLines } = node
   if (type === "label" || type === "labelHatched") {
     const w = label.length * CHAR_RATIO.label * opts.labelFontSize + opts.labelPaddingH * 2
     const h = opts.labelFontSize * 1.4 + opts.labelPaddingV * 2
@@ -177,6 +178,29 @@ function nodeBox(node: NodeData, opts: BoxOptions): { width: number; height: num
   }
 
   if (!activeSlots.length) {
+    const activeBody = bodyLines?.filter(Boolean) ?? []
+    if (activeBody.length > 0) {
+      const headerTextW = label.length * CHAR_RATIO.registry * opts.fontSize
+      const headerLineH = opts.fontSize * 1.4
+      const lineH = opts.labelFontSize * 1.4
+      let maxBodyW = 0
+      for (const line of activeBody) {
+        maxBodyW = Math.max(
+          maxBodyW,
+          line.length * CHAR_RATIO.registry * opts.labelFontSize + opts.labelPaddingH * 2
+        )
+      }
+      const innerContentW = Math.max(headerTextW, maxBodyW) + opts.paddingH * 2
+      const stackH =
+        activeBody.length * lineH +
+        (activeBody.length > 1 ? (activeBody.length - 1) * REGISTRY_SLOT_TEXT_GAP : 0)
+      const innerContentH =
+        opts.paddingV + headerLineH + REGISTRY_HEADER_SLOT_GAP + stackH + opts.paddingV
+      return {
+        width: Math.max(minW, innerContentW + frameBreadth),
+        height: innerContentH + frameBreadth,
+      }
+    }
     const w =
       label.length * CHAR_RATIO.registry * opts.fontSize + opts.paddingH * 2 + frameBreadth
     const h = opts.fontSize * 1.4 + opts.paddingV * 2 + frameBreadth
@@ -322,7 +346,66 @@ function isAxisAligned(
 function effectiveOrthogonalStyle(edge: EdgeData): EdgeOrthogonalStyle {
   if (edge.orthogonalStyle === "hv" || edge.orthogonalStyle === "vhv") return edge.orthogonalStyle
   if (edge.fromSlotIndex !== undefined) return "vhv"
+  if (edge.linkStyle === "dotted" || isAliasEdge(edge.label)) return "hv"
   return "hv"
+}
+
+/** Parent → child solid edge without slot pins or alias routing (target below source in TB). */
+export function isHierarchySolidEdge(
+  edge: EdgeData,
+  from: PositionedNode | undefined,
+  to: PositionedNode | undefined
+): boolean {
+  if (!from || !to) return false
+  if (isAliasRouteEdge(edge)) return false
+  if (edge.fromSlotIndex !== undefined || edge.toSlotIndex !== undefined) return false
+  const style = edge.linkStyle ?? "solid"
+  if (style !== "solid") return false
+  if (from.rank === undefined || to.rank === undefined) return false
+  return to.rank > from.rank
+}
+
+/** Alias edges between nodes that share a solid parent (siblings in the tree). */
+function areAliasSiblingNodes(edges: EdgeData[], fromId: string, toId: string): boolean {
+  const solidParents = (nodeId: string) =>
+    edges
+      .filter(
+        (e) =>
+          e.to === nodeId &&
+          !isAliasRouteEdge(e) &&
+          (e.linkStyle ?? "solid") === "solid" &&
+          e.fromSlotIndex === undefined
+      )
+      .map((e) => e.from)
+  const fromParents = solidParents(fromId)
+  return solidParents(toId).some((p) => fromParents.includes(p))
+}
+
+/**
+ * Dedicated vhv (or hv override) path for parent → child solid hierarchy edges.
+ * Tail: source bottom-center; head: target top-center.
+ */
+export function buildHierarchyEdgePolyline(
+  from: PositionedNode,
+  to: PositionedNode,
+  style: EdgeOrthogonalStyle = "vhv"
+): { x: number; y: number }[] {
+  const fromCx = from.x + from.width / 2
+  const toCx = to.x + to.width / 2
+  const tail = { x: fromCx, y: from.y + from.height }
+  const head = { x: toCx, y: to.y }
+
+  if (style === "hv") {
+    return simplifyAxisCollinear([tail, { x: toCx, y: tail.y }, head])
+  }
+
+  const yMid = (tail.y + head.y) / 2
+  return simplifyAxisCollinear([
+    tail,
+    { x: fromCx, y: yMid },
+    { x: toCx, y: yMid },
+    head,
+  ])
 }
 
 /**
@@ -412,17 +495,126 @@ function snapFinalHorizontalRunToY(points: { x: number; y: number }[], cy: numbe
 /** Align the last approach leg with the target’s attachment edge center (for arrow + rounded path). */
 function snapEdgeEndToTargetAttachment(
   points: { x: number; y: number }[],
-  target: PositionedNode
+  target: PositionedNode,
+  attachment: "auto" | "side" = "auto"
 ): void {
   if (points.length < 2) return
   const a = points[points.length - 2]
   const b = points[points.length - 1]
   const cx = target.x + target.width / 2
   const cy = target.y + target.height / 2
+
+  if (attachment === "side") {
+    const fromLeft = a.x < cx
+    const attachX = fromLeft ? target.x : target.x + target.width
+    points[points.length - 1] = { x: attachX, y: cy }
+    if (points.length >= 2) {
+      const prev = points[points.length - 2]
+      if (Math.abs(prev.y - cy) >= ORTH_EPS) {
+        points[points.length - 2] = { x: prev.x, y: cy }
+      }
+    }
+    return
+  }
+
   const dx = Math.abs(b.x - a.x)
   const dy = Math.abs(b.y - a.y)
   if (dx < ORTH_EPS && dy >= ORTH_EPS) snapFinalVerticalRunToX(points, cx)
   else if (dy < ORTH_EPS && dx >= ORTH_EPS) snapFinalHorizontalRunToY(points, cy)
+}
+
+/**
+ * Assign lane indices for alias edges that share a target (sorted by source x)
+ * so dev → prod and staging → prod do not overlap.
+ */
+function buildAliasLaneIndexByEdge(
+  edges: EdgeData[],
+  nodeById: Map<string, PositionedNode>
+): Map<number, number> {
+  const byTarget = new Map<string, number[]>()
+  edges.forEach((edge, i) => {
+    if (!isAliasRouteEdge(edge)) return
+    const list = byTarget.get(edge.to) ?? []
+    list.push(i)
+    byTarget.set(edge.to, list)
+  })
+
+  const laneByEdge = new Map<number, number>()
+  for (const indices of byTarget.values()) {
+    const sorted = [...indices].sort((a, b) => {
+      const ax = nodeById.get(edges[a].from)?.x ?? 0
+      const bx = nodeById.get(edges[b].from)?.x ?? 0
+      return ax - bx
+    })
+    sorted.forEach((edgeIdx, lane) => laneByEdge.set(edgeIdx, lane))
+  }
+  return laneByEdge
+}
+
+/**
+ * Dedicated orthogonal path for Mermaid `-. alias .->` edges.
+ * Same-rank aliases drop below both nodes and enter the target top-center.
+ * Cross-rank aliases drop from source bottom, run a horizontal lane, enter target side.
+ */
+function buildAliasEdgePolyline(
+  from: PositionedNode,
+  to: PositionedNode,
+  laneIndex: number,
+  laneCount: number,
+  edges: EdgeData[]
+): { x: number; y: number }[] {
+  const fromCx = from.x + from.width / 2
+  const toCx = to.x + to.width / 2
+  const fromBottom = from.y + from.height
+  const toTop = to.y
+  const toBottom = to.y + to.height
+  const toCy = to.y + to.height / 2
+
+  const sameRank = from.rank !== undefined && to.rank !== undefined && from.rank === to.rank
+  const siblingAlias = areAliasSiblingNodes(edges, from.id, to.id)
+  const topEntry = sameRank || siblingAlias
+
+  if (topEntry) {
+    const maxBottom = Math.max(fromBottom, toBottom)
+    const gap = Math.max(24, 12)
+    const baseLaneY = maxBottom + gap * ALIAS_ROUTING.laneFill
+    const laneY =
+      baseLaneY + (laneIndex - (laneCount - 1) / 2) * ALIAS_ROUTING.laneGap
+
+    return simplifyAxisCollinear([
+      { x: fromCx, y: fromBottom },
+      { x: fromCx, y: laneY },
+      { x: toCx, y: laneY },
+      { x: toCx, y: toTop },
+    ])
+  }
+
+  const gap = Math.max(toTop - fromBottom, 24)
+  const baseLaneY = fromBottom + gap * ALIAS_ROUTING.laneFill
+  const laneY =
+    baseLaneY + (laneIndex - (laneCount - 1) / 2) * ALIAS_ROUTING.laneGap
+
+  const sourceIsLeft = fromCx <= toCx
+  const endX = sourceIsLeft ? to.x : to.x + to.width
+  const approachX = sourceIsLeft
+    ? endX - ALIAS_ROUTING.sideStub
+    : endX + ALIAS_ROUTING.sideStub
+
+  return [
+    { x: fromCx, y: fromBottom },
+    { x: fromCx, y: laneY },
+    { x: approachX, y: laneY },
+    { x: approachX, y: toCy },
+    { x: endX, y: toCy },
+  ]
+}
+
+function aliasLaneCountForTarget(edges: EdgeData[], targetId: string): number {
+  let count = 0
+  for (const e of edges) {
+    if (isAliasRouteEdge(e) && e.to === targetId) count++
+  }
+  return Math.max(1, count)
 }
 
 /** Drop middle vertices that lie on the same axis-aligned segment as their neighbors. */
@@ -599,15 +791,36 @@ export function computeLayout(
   applySlotAnchors(positionedNodes, edges, positionedEdges, boxOpts, cornerRadius)
 
   const nodeById = new Map(positionedNodes.map((n) => [n.id, n]))
+  const aliasLaneByEdge = buildAliasLaneIndexByEdge(edges, nodeById)
 
   for (let i = 0; i < positionedEdges.length; i++) {
     const pe = positionedEdges[i]
     const edge = edges[i]
+    const toNode = nodeById.get(edge.to)
+    const fromNode = nodeById.get(edge.from)
+
+    if (isAliasRouteEdge(edge) && fromNode && toNode) {
+      const lane = aliasLaneByEdge.get(i) ?? 0
+      const laneCount = aliasLaneCountForTarget(edges, edge.to)
+      pe.points = buildAliasEdgePolyline(fromNode, toNode, lane, laneCount, edges)
+      pe.d = pointsToPath(pe.points, cornerRadius)
+      continue
+    }
+
+    if (isHierarchySolidEdge(edge, fromNode, toNode) && fromNode && toNode) {
+      const style =
+        edge.orthogonalStyle === "hv" || edge.orthogonalStyle === "vhv"
+          ? edge.orthogonalStyle
+          : "vhv"
+      pe.points = buildHierarchyEdgePolyline(fromNode, toNode, style)
+      pe.d = pointsToPath(pe.points, cornerRadius)
+      continue
+    }
+
     if (pe.points.length >= 2) {
       pe.points = orthogonalizePolyline(pe.points, effectiveOrthogonalStyle(edge))
-      const toNode = nodeById.get(edge.to)
       if (toNode !== undefined && edge.toSlotIndex === undefined) {
-        snapEdgeEndToTargetAttachment(pe.points, toNode)
+        snapEdgeEndToTargetAttachment(pe.points, toNode, "auto")
       }
       pe.d = pointsToPath(pe.points, cornerRadius)
     }
