@@ -110,6 +110,8 @@ Alias edges (`-. alias .->`) always use the dedicated alias router; `route=` doe
 
 Copy the **Docs embed (MDX)** snippet from the right panel. Payload schema: `ens-osse/v1` (see [naming.md](./naming.md)) with `mermaid`, `mode`, and optional `caption`.
 
+Use `<OsseEmbed mermaid={…} mode="…" />` from `@ensdomains/osse`, or fence source as ` ```osse ` with the remark plugin `@ensdomains/osse/remark`. Optional YAML frontmatter (`theme`, `animation`, `pulse`, `fit`) is documented in [mermaid-patterns.md](./mermaid-patterns.md#yaml-frontmatter-document-config).
+
 **Nested column caveat:** the live demo merges JSON `children` onto `registry-root` for the nested-column preset. Mermaid alone cannot express nested registries — docs consumers need the same merge or raw `NodeData[]`. See [mermaid-patterns.md § Nested registries](./mermaid-patterns.md#nested-registries).
 
 ---

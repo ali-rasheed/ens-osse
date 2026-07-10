@@ -1,8 +1,37 @@
-# Mermaid patterns (ENS Registry Diagram)
+# Mermaid patterns (ENS Ossë)
 
-**Source of truth** for the diagram editor’s Mermaid-like syntax. The parser lives in [`src/lib/mermaid.ts`](../src/lib/mermaid.ts). Preset graphs live in [`src/lib/mermaidTemplates.ts`](../src/lib/mermaidTemplates.ts).
+**Source of truth** for the diagram editor’s Mermaid-like syntax. The parser lives in [`packages/osse/src/mermaid.ts`](../packages/osse/src/mermaid.ts). Preset graphs live in [`src/lib/mermaidTemplates.ts`](../src/lib/mermaidTemplates.ts). Naming: [`docs/naming.md`](./naming.md).
 
 This is **not** full Mermaid: only the patterns below are supported. Lines are trimmed; `//` and `%%` comments are ignored. The first line may be `graph TD` or `flowchart TD` (case-insensitive).
+
+---
+
+## YAML frontmatter (document config)
+
+Optional leading block (mermaid-conventional). Sets theme, animation, path pulse, and fit mode for the whole diagram:
+
+```text
+---
+theme: protocol
+animation: { preset: draw, stagger: 0.4 }
+pulse: { from: root, to: resolver1 }
+fit: clamp
+---
+graph TD
+  root[eth] --> resolver1{Resolver}
+```
+
+| Key | Values | Notes |
+|-----|--------|-------|
+| `theme` | `light` \| `dark` \| `protocol` \| `docs` | `docs` aliases `light` |
+| `animation` | preset name or `{ preset, stagger, duration }` | Entrance preset |
+| `stagger` | number (seconds) | Merged into `animation.stagger` |
+| `pulse` | `{ from, to, stagger?, segmentDuration?, hold? }` | Path pulse between node ids |
+| `fit` | `none` \| `width` \| `clamp` | Hint for responsive hosts |
+
+Consumed by `parseMermaid` → `ParsedGraph.frontmatter` and by `<OsseDiagram source={…} />`.
+
+Docs authors can fence the same source as ` ```osse ` (remark plugin `@ensdomains/osse/remark`).
 
 ---
 
