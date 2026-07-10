@@ -1,0 +1,62 @@
+{
+  "name": "@ensdomains/osse",
+  "version": "0.1.0",
+  "description": "ENS Ossë — protocol diagrams from Mermaid-compatible source",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mermaid": {
+      "types": "./dist/mermaid.d.ts",
+      "import": "./dist/mermaid.js"
+    },
+    "./export": {
+      "types": "./dist/export.d.ts",
+      "import": "./dist/export.js"
+    },
+    "./remark": {
+      "types": "./dist/remark.d.ts",
+      "import": "./dist/remark.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --config ../../vitest.config.ts"
+  },
+  "peerDependencies": {
+    "motion": "^11",
+    "react": "^18 || ^19",
+    "react-dom": "^18 || ^19"
+  },
+  "peerDependenciesMeta": {
+    "html-to-image": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "dagre": "^0.8.5"
+  },
+  "devDependencies": {
+    "@types/dagre": "^0.7.4",
+    "@types/mdast": "^4.0.4",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "html-to-image": "^1.11.13",
+    "motion": "^11",
+    "react": "^18",
+    "react-dom": "^18",
+    "tsup": "^8.5.0",
+    "typescript": "^5",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.0.0"
+  }
+}

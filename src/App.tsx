@@ -7,25 +7,23 @@ import { motion } from "motion/react"
 import { DialRoot, useDialKit } from "dialkit"
 import "dialkit/styles.css"
 import { EnsMarkLogo } from "./components/EnsMarkLogo"
-import { RegistryDiagram } from "./components/RegistryDiagram"
 import {
+  OsseDiagram,
   ANIMATION_PRESET_OPTIONS,
   DEFAULT_ANIMATION_CONFIG,
-} from "./components/RegistryDiagram/animationConfig"
-import type {
-  AnimationConfig,
-  DiagramConfig,
-  PathPulseConfig,
-} from "./components/RegistryDiagram/types"
-import {
   APP_CHROME_BY_MODE,
   DIAGRAM_PALETTE_BY_MODE,
   protocolMainBackground,
   protocolMainBackgroundSize,
   diagramExportBackground,
+  parseMermaid,
+  downloadDiagramPng,
+  type AnimationConfig,
+  type DiagramConfig,
+  type PathPulseConfig,
   type DiagramMode,
-} from "./components/RegistryDiagram/theme"
-import { parseMermaid } from "./lib/mermaid"
+  type ExportScale,
+} from "@ensdomains/osse"
 import {
   MERMAID_TEMPLATES,
   NESTED_COLUMN_MERMAID,
@@ -35,7 +33,6 @@ import {
 import mermaidPatternsSource from "../docs/mermaid-patterns.md?raw"
 import userGuideSource from "../docs/docs.md?raw"
 import { buildDocsEmbedSnippet } from "./lib/docsEmbed"
-import { downloadDiagramPng, type ExportScale } from "./lib/exportPng"
 import { mergeNestedColumnDemoNodes } from "./lib/nestedColumnDemoData"
 
 /** Initial editor: nested preset; bundled JSON children merge in `mergeNestedColumnDemoNodes`. */
@@ -480,7 +477,7 @@ export default function App() {
               maxWidth: "100%",
             }}
           >
-            <RegistryDiagram
+            <OsseDiagram
               ref={diagramRef}
               key={key}
               nodes={diagramNodes}

@@ -4,7 +4,7 @@
  * Mermaid still cannot encode runtime `children`; the template now includes a comment hierarchy, while
  * this module provides the authoritative NodeData JSON merged onto `registry-root`.
  */
-import type { NodeData } from "../components/RegistryDiagram/types"
+import type { NodeData } from "@ensdomains/osse"
 import { findTemplateIdForSource } from "./mermaidTemplates"
 
 export const NESTED_COLUMN_ROOT_ID = "registry-root" as const

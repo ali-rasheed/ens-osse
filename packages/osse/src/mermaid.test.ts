@@ -4,7 +4,7 @@ import {
   ENSV2_ALIAS_SIBLINGS_MERMAID,
   ENSV2_DELEGATED_RECORDS_MERMAID,
   ENSV2_FLEXIBLE_REGISTRY_MERMAID,
-} from "./mermaidTemplates"
+} from "../../../src/lib/mermaidTemplates"
 
 describe("parseMermaid — ENS v2 alias siblings", () => {
   it("parses chained parent edges and dotted alias links", () => {
@@ -69,5 +69,53 @@ describe("chained edges", () => {
   a --> b & c`)
     expect(edges).toHaveLength(2)
     expect(edges.map((e) => e.to).sort()).toEqual(["b", "c"])
+  })
+})
+
+describe("YAML frontmatter", () => {
+  it("parses theme, animation, stagger, pulse, and fit", () => {
+    const src = `---
+theme: protocol
+animation: { preset: draw, stagger: 0.4 }
+pulse: { from: root, to: resolver1 }
+fit: clamp
+---
+graph TD
+  root[eth] --> resolver1{Resolver}
+`
+    const { nodes, edges, frontmatter, error } = parseMermaid(src)
+    expect(error).toBeUndefined()
+    expect(nodes).toHaveLength(2)
+    expect(edges).toHaveLength(1)
+    expect(frontmatter?.theme).toBe("protocol")
+    expect(frontmatter?.animation?.preset).toBe("draw")
+    expect(frontmatter?.animation?.stagger).toBe(0.4)
+    expect(frontmatter?.pulse?.from).toBe("root")
+    expect(frontmatter?.pulse?.to).toBe("resolver1")
+    expect(frontmatter?.fit).toBe("clamp")
+  })
+
+  it("maps theme docs to light", () => {
+    const { frontmatter, error } = parseMermaid(`---
+theme: docs
+---
+graph TD
+  a[A]
+`)
+    expect(error).toBeUndefined()
+    expect(frontmatter?.theme).toBe("light")
+  })
+
+  it("accepts top-level stagger into animation", () => {
+    const { frontmatter, error } = parseMermaid(`---
+animation: fade
+stagger: 0.2
+---
+graph TD
+  a[A]
+`)
+    expect(error).toBeUndefined()
+    expect(frontmatter?.animation?.preset).toBe("fade")
+    expect(frontmatter?.animation?.stagger).toBe(0.2)
   })
 })

@@ -1,15 +1,22 @@
 # Packaging (npm library)
 
-Roadmap for turning [`src/components/RegistryDiagram/`](../src/components/RegistryDiagram/) into a publishable package (workspaces, `tsup`, peer deps, subpath exports for mermaid + PNG helpers) lives in the maintainer’s Cursor plan file **package_registry_diagram_lib** (same content summarized below). This file is the contributor-facing pointer so we do not rely on `.cursor/` paths in git clones.
+Workspace package **`@ensdomains/osse`** lives in [`packages/osse/`](../packages/osse/). Naming: [naming.md](./naming.md).
 
-## Target shape
+## Shape
 
-Naming decision (product, package, schema, fence): [naming.md](./naming.md). Target package **`@ensdomains/osse`**.
+- Root `package.json`: `"workspaces": ["packages/*"]`.
+- Library build: `tsup` → ESM + `.d.ts` (`npm run lib:build`).
+- Peers: `react`, `react-dom`, `motion`.
+- Exports:
+  - `.` — `OsseDiagram`, `OsseEmbed`, types, theme, layout
+  - `./mermaid` — `parseMermaid` / `serializeMermaid` / frontmatter
+  - `./export` — PNG helper (`html-to-image` optional)
+  - `./remark` — remark/MDX plugin for fenced `osse` blocks
 
-- Root `package.json` gains `workspaces: ["packages/*"]`.
-- New `packages/osse` holds moved sources; demo app depends on `workspace:*`.
-- Build: ESM + `.d.ts`; peers: `react`, `react-dom`, `motion`; optional subpaths for `./mermaid` and `./export`.
+## Demo app
+
+Depends on `"@ensdomains/osse": "*"`. Vite + `tsconfig` path aliases point at package source for local iteration; production `npm run build` runs `lib:build` first.
 
 ## Before first publish
 
-See [devrel.md](./devrel.md) and run `npm run devrel:revisit`. Confirm README live URL, embed docs, and any change to `ens-osse/v1` (see [naming.md](./naming.md)) or parser behavior is noted for consumers.
+See [devrel.md](./devrel.md) and run `npm run devrel:revisit`. Confirm README live URL, embed docs, and any change to `ens-osse/v1` or parser behavior is noted for consumers.

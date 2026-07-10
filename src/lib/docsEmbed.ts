@@ -6,9 +6,13 @@
  *
  * Schema and public names: `docs/naming.md`.
  */
-import type { DiagramMode } from "../components/RegistryDiagram/theme"
+import {
+  OSSE_EMBED_SCHEMA,
+  buildOsseEmbedPayload,
+  type DiagramMode,
+} from "@ensdomains/osse"
 
-export const OSSE_EMBED_SCHEMA = "ens-osse/v1" as const
+export { OSSE_EMBED_SCHEMA }
 
 export interface DocsEmbedPayload {
   schema: typeof OSSE_EMBED_SCHEMA
@@ -23,12 +27,7 @@ export function buildDocsEmbedSnippet(
   mode: DiagramMode,
   caption?: string
 ): string {
-  const payload: DocsEmbedPayload = {
-    schema: OSSE_EMBED_SCHEMA,
-    mermaid,
-    mode,
-    ...(caption?.trim() ? { caption: caption.trim() } : {}),
-  }
+  const payload = buildOsseEmbedPayload(mermaid, mode, caption)
   const json = JSON.stringify(payload, null, 2)
   const mermaidOneLine = JSON.stringify(mermaid)
 
@@ -45,7 +44,7 @@ export function buildDocsEmbedSnippet(
     json,
     "```",
     "",
-    "Example MDX once an embed component exists in the docs app:",
+    "Example MDX (fence language `osse` + remark plugin `@ensdomains/osse/remark`):",
     "",
     "```mdx",
     "<OsseEmbed",
@@ -54,6 +53,10 @@ export function buildDocsEmbedSnippet(
     "/>",
     "```",
     "",
-    "Until then: store the JSON in your page bundle or pass `mermaid` + `mode` props to your diagram wrapper.",
+    "Or write a fenced block:",
+    "",
+    "```osse",
+    mermaid.trim(),
+    "```",
   ].join("\n")
 }

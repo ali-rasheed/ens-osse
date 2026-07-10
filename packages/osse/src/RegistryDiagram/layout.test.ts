@@ -2,14 +2,14 @@
  * Layout routing assertions — polyline shape per edge class and smoke tests for preset graphs.
  */
 import { describe, expect, it } from "vitest"
-import { parseMermaid } from "../../lib/mermaid"
+import { parseMermaid } from "../mermaid"
 import {
   CLASSIC_ENS_TREE_MERMAID,
   ENSV2_ALIAS_SIBLINGS_MERMAID,
   ENSV2_DELEGATED_RECORDS_MERMAID,
   NESTED_COLUMN_MERMAID,
-} from "../../lib/mermaidTemplates"
-import { mergeNestedColumnDemoNodes } from "../../lib/nestedColumnDemoData"
+} from "../../../../src/lib/mermaidTemplates"
+import { mergeNestedColumnDemoNodes } from "../../../../src/lib/nestedColumnDemoData"
 import {
   buildHierarchyEdgePolyline,
   computeLayout,

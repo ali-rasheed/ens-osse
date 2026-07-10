@@ -1,8 +1,12 @@
 import type {
   NodeData,
   EdgeData,
-} from "../components/RegistryDiagram/types"
-import type { LinkStyle } from "../components/RegistryDiagram/linkStyles"
+} from "./RegistryDiagram/types"
+import type { LinkStyle } from "./RegistryDiagram/linkStyles"
+import { extractFrontmatter, type OsseFrontmatter } from "./frontmatter"
+
+export type { FitMode, OsseFrontmatter, FrontmatterParseResult } from "./frontmatter"
+export { extractFrontmatter, parseFrontmatterBlock } from "./frontmatter"
 
 /* Double-paren first so `((hatched))` does not match as a single `(`. */
 const NODE_RE =
@@ -303,6 +307,8 @@ export interface ParsedGraph {
   nodes: NodeData[]
   edges: EdgeData[]
   caption?: string
+  /** Document-level config from leading YAML `---` frontmatter. */
+  frontmatter?: OsseFrontmatter
   error?: string
 }
 
@@ -311,6 +317,7 @@ const CAPTION_RE = /^%%\s*caption:?\s*(.+)$/i
 /**
  * Parser for the project’s Mermaid subset. Canonical spec: `docs/mermaid-patterns.md`.
  *
+ * Optional YAML frontmatter (`---` … `---`) sets theme, animation, pulse, and fit (§7A).
  * Nested `registry.children` trees are not expressible in this syntax; use JSON `NodeData[]`.
  * Mermaid-compatible links: `-->`, `---`, `-.->`, `==>`, `-- text -->`, `-. text .->`, `-->|text|`.
  * Multiline labels: `<br/>` inside brackets or quotes.
@@ -320,7 +327,13 @@ export function parseMermaid(src: string): ParsedGraph {
   const edges: EdgeData[] = []
   let caption: string | undefined
   try {
-    const rawLines = src
+    const extracted = extractFrontmatter(src)
+    if (extracted.error) {
+      return { nodes: [], edges: [], error: extracted.error, frontmatter: extracted.frontmatter }
+    }
+    const frontmatter = extracted.frontmatter
+
+    const rawLines = extracted.body
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l && !l.startsWith("//"))
@@ -371,7 +384,12 @@ export function parseMermaid(src: string): ParsedGraph {
       if (!nodeMap.has(e.from)) nodeMap.set(e.from, { id: e.from, title: e.from, type: "registry" })
       if (!nodeMap.has(e.to)) nodeMap.set(e.to, { id: e.to, title: e.to, type: "registry" })
     }
-    return { nodes: Array.from(nodeMap.values()), edges, caption }
+    return {
+      nodes: Array.from(nodeMap.values()),
+      edges,
+      caption,
+      ...(frontmatter ? { frontmatter } : {}),
+    }
   } catch (err) {
     return {
       nodes: [],
