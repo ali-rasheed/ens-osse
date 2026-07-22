@@ -4,12 +4,19 @@
  * edge anchors on hatched slot bottom-centers (Figma Diagram System ports). Registries default
  * to a double outline; `registryFrame: "single"` or Mermaid ` # frame=single` uses one stroke.
  * Edge polylines
- * are orthogonalized to axis-aligned segments (90° only); `pointsToPath` fillets 90° bends
- * using the layout `cornerRadius` (quadratic beziers). Final approach legs are snapped to
+ * are orthogonalized to axis-aligned segments (90° only); `pointsToPath` fillets bends of any
+ * angle using the layout `cornerRadius` (quadratic beziers) and emits straight `L` runs for
+ * diagonal legs. Final approach legs are snapped to
  * the target node’s top/bottom center (vertical tail) or left/right center (horizontal tail)
  * so the arrow meets the frame on-axis (skipped when `toSlotIndex` pins the head to a slot).
+ *
+ * Octilinear vocabulary (layout invariant 2): edges use horizontal, vertical, and 45° segments
+ * only. `insertChamfer45` softens 90° bends into 45° legs (opt-in via `LayoutOptions.chamfer`,
+ * wired into the hierarchy/alias routers); `validateOctilinear` asserts the vocabulary in tests —
+ * every 45° leg is sandwiched by axis-aligned legs, and port approach legs stay axis-aligned.
  */
 import dagre from "dagre"
+import type { GraphDirection } from "../mermaid"
 import { ALIAS_ROUTING, isAliasEdge, isAliasRouteEdge } from "./linkStyles"
 import type {
   NodeData,
@@ -237,7 +244,15 @@ const PADDING = 40
 export interface LayoutOptions {
   ranksep?: number
   nodesep?: number
+  /** Dagre rank direction from Mermaid `graph TD|LR|…`. Hierarchy routers are TB-tuned. */
+  direction?: GraphDirection
   cornerRadius?: number
+  /**
+   * When > 0, soften the hierarchy/alias routers' 90° bends into 45° legs of this size (px),
+   * yielding octilinear (H/V/45°) paths. Defaults to 0 (pure orthogonal); `OCTILINEAR_CHAMFER`
+   * is the recommended value. The `# route=chamfer` token exposes this per-edge (port-tokens todo).
+   */
+  chamfer?: number
   fontSize?: number
   paddingH?: number
   paddingV?: number
@@ -304,6 +319,12 @@ export function layoutNodeDimensions(
 
 const ORTH_EPS = 0.5
 
+/**
+ * Serialize a polyline to an SVG path. Straight legs (axis-aligned or 45° diagonal) emit `L`
+ * segments; interior bends of any angle are filleted with a quadratic bezier clamped to
+ * `cornerRadius` and half of each adjoining leg. With `cornerRadius <= 0` or fewer than 3 points,
+ * it emits a pure `M`/`L` polyline (diagonals included).
+ */
 function pointsToPath(points: { x: number; y: number }[], cornerRadius: number): string {
   if (points.length === 0) return ""
   if (points.length < 3 || cornerRadius <= 0) {
@@ -341,6 +362,95 @@ function isAxisAligned(
   b: { x: number; y: number }
 ): boolean {
   return Math.abs(a.x - b.x) < ORTH_EPS || Math.abs(a.y - b.y) < ORTH_EPS
+}
+
+type Pt = { x: number; y: number }
+
+/** Segment classification for octilinear validation: horizontal, vertical, 45°, zero-length, or off-grid. */
+type SegKind = "h" | "v" | "d45" | "zero" | "other"
+
+function segKind(a: Pt, b: Pt): SegKind {
+  const adx = Math.abs(b.x - a.x)
+  const ady = Math.abs(b.y - a.y)
+  if (adx < ORTH_EPS && ady < ORTH_EPS) return "zero"
+  if (ady < ORTH_EPS) return "h"
+  if (adx < ORTH_EPS) return "v"
+  if (Math.abs(adx - ady) < ORTH_EPS) return "d45"
+  return "other"
+}
+
+export interface OctilinearValidation {
+  ok: boolean
+  reason?: string
+}
+
+/**
+ * Validate a polyline against the octilinear vocabulary (layout invariant 2):
+ * every segment is horizontal, vertical, or exactly 45°; each 45° leg is sandwiched by
+ * axis-aligned legs at both ends; and the first/last legs (port approach) stay axis-aligned.
+ * Zero-length segments are ignored; a polyline with fewer than two distinct points is trivially ok.
+ */
+export function validateOctilinear(points: Pt[]): OctilinearValidation {
+  const kinds: SegKind[] = []
+  for (let i = 1; i < points.length; i++) {
+    const k = segKind(points[i - 1], points[i])
+    if (k === "zero") continue
+    if (k === "other") return { ok: false, reason: `segment ${i} is neither horizontal, vertical, nor 45°` }
+    kinds.push(k)
+  }
+  for (let i = 0; i < kinds.length; i++) {
+    if (kinds[i] !== "d45") continue
+    if (i === 0 || i === kinds.length - 1)
+      return { ok: false, reason: "45° leg cannot be a port approach (first/last leg must be axis-aligned)" }
+    if (kinds[i - 1] === "d45" || kinds[i + 1] === "d45")
+      return { ok: false, reason: "45° leg must be sandwiched by axis-aligned legs at both ends" }
+  }
+  return { ok: true }
+}
+
+/** Default 45° chamfer size (px) cut from each leg of a 90° bend when octilinear chamfering is enabled. */
+export const OCTILINEAR_CHAMFER = 12
+
+/**
+ * Replace each 90° bend (perpendicular axis-aligned legs) with a symmetric 45° chamfer: retreat
+ * `chamfer` px back along the incoming leg and advance `chamfer` px along the outgoing leg, so the
+ * connecting leg is exactly 45°. Endpoints are preserved (port attachment stays axis-aligned) and
+ * non-orthogonal or straight vertices are left untouched. The retreat is clamped to half of each
+ * adjoining leg so adjacent chamfers never overrun a shared leg.
+ */
+export function insertChamfer45(points: Pt[], chamfer: number): Pt[] {
+  if (chamfer <= 0 || points.length < 3) return points.slice()
+  const out: Pt[] = [points[0]]
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1]
+    const curr = points[i]
+    const next = points[i + 1]
+    const inKind = segKind(prev, curr)
+    const outKind = segKind(curr, next)
+    const isRightAngle =
+      (inKind === "h" && outKind === "v") || (inKind === "v" && outKind === "h")
+    if (!isRightAngle) {
+      out.push(curr)
+      continue
+    }
+    const lenIn = Math.hypot(curr.x - prev.x, curr.y - prev.y)
+    const lenOut = Math.hypot(next.x - curr.x, next.y - curr.y)
+    const c = Math.min(chamfer, lenIn / 2, lenOut / 2)
+    if (c < ORTH_EPS) {
+      out.push(curr)
+      continue
+    }
+    out.push({
+      x: curr.x - ((curr.x - prev.x) / lenIn) * c,
+      y: curr.y - ((curr.y - prev.y) / lenIn) * c,
+    })
+    out.push({
+      x: curr.x + ((next.x - curr.x) / lenOut) * c,
+      y: curr.y + ((next.y - curr.y) / lenOut) * c,
+    })
+  }
+  out.push(points[points.length - 1])
+  return out
 }
 
 function effectiveOrthogonalStyle(edge: EdgeData): EdgeOrthogonalStyle {
@@ -553,8 +663,12 @@ function buildAliasLaneIndexByEdge(
 
 /**
  * Dedicated orthogonal path for Mermaid `-. alias .->` edges.
- * Same-rank aliases drop below both nodes and enter the target top-center.
- * Cross-rank aliases drop from source bottom, run a horizontal lane, enter target side.
+ *
+ * Same-rank / sibling aliases: drop below both nodes, run a horizontal lane, enter the
+ * target bottom-center. (Entering top from a below-lane would either cut through the
+ * node or detour above into the hierarchy fan-out and park labels on parent→child edges.)
+ *
+ * Cross-rank aliases: drop from source bottom, run a horizontal lane, enter target side.
  */
 function buildAliasEdgePolyline(
   from: PositionedNode,
@@ -572,12 +686,13 @@ function buildAliasEdgePolyline(
 
   const sameRank = from.rank !== undefined && to.rank !== undefined && from.rank === to.rank
   const siblingAlias = areAliasSiblingNodes(edges, from.id, to.id)
-  const topEntry = sameRank || siblingAlias
+  const belowLaneEntry = sameRank || siblingAlias
 
-  if (topEntry) {
+  if (belowLaneEntry) {
     const maxBottom = Math.max(fromBottom, toBottom)
     const gap = Math.max(24, 12)
-    const baseLaneY = maxBottom + gap * ALIAS_ROUTING.laneFill
+    const baseLaneY =
+      maxBottom + Math.max(ALIAS_ROUTING.belowClearance, gap * ALIAS_ROUTING.laneFill)
     const laneY =
       baseLaneY + (laneIndex - (laneCount - 1) / 2) * ALIAS_ROUTING.laneGap
 
@@ -585,7 +700,7 @@ function buildAliasEdgePolyline(
       { x: fromCx, y: fromBottom },
       { x: fromCx, y: laneY },
       { x: toCx, y: laneY },
-      { x: toCx, y: toTop },
+      { x: toCx, y: toBottom },
     ])
   }
 
@@ -734,16 +849,21 @@ function applySlotAnchors(
   }
 }
 
+function dagreRankdir(direction?: GraphDirection): string {
+  if (!direction || direction === "TD" || direction === "TB") return "TB"
+  return direction
+}
+
 export function computeLayout(
   nodes: NodeData[],
   edges: EdgeData[],
   options: LayoutOptions = {}
 ): LayoutResult {
-  const { ranksep = 70, nodesep = 50, cornerRadius = 10, ...layoutRest } = options
+  const { ranksep = 70, nodesep = 50, cornerRadius = 10, chamfer = 0, direction, ...layoutRest } = options
   const boxOpts = buildBoxOptions(layoutRest)
   const g = new dagre.graphlib.Graph()
   g.setGraph({
-    rankdir: "TB",
+    rankdir: dagreRankdir(direction),
     ranksep,
     nodesep,
     edgesep: 10,
@@ -757,7 +877,11 @@ export function computeLayout(
     g.setNode(node.id, { label: node.title, width, height })
   }
 
+  // Alias / dotted lateral edges must not participate in ranking — otherwise a sibling
+  // alias target (e.g. prod ← dev/staging) is pulled onto a lower rank and hierarchy
+  // edges punch through the middle of same-column siblings.
   for (const edge of edges) {
+    if (isAliasRouteEdge(edge)) continue
     g.setEdge(edge.from, edge.to)
   }
 
@@ -802,7 +926,10 @@ export function computeLayout(
     if (isAliasRouteEdge(edge) && fromNode && toNode) {
       const lane = aliasLaneByEdge.get(i) ?? 0
       const laneCount = aliasLaneCountForTarget(edges, edge.to)
-      pe.points = buildAliasEdgePolyline(fromNode, toNode, lane, laneCount, edges)
+      pe.points = insertChamfer45(
+        buildAliasEdgePolyline(fromNode, toNode, lane, laneCount, edges),
+        chamfer
+      )
       pe.d = pointsToPath(pe.points, cornerRadius)
       continue
     }
@@ -812,7 +939,7 @@ export function computeLayout(
         edge.orthogonalStyle === "hv" || edge.orthogonalStyle === "vhv"
           ? edge.orthogonalStyle
           : "vhv"
-      pe.points = buildHierarchyEdgePolyline(fromNode, toNode, style)
+      pe.points = insertChamfer45(buildHierarchyEdgePolyline(fromNode, toNode, style), chamfer)
       pe.d = pointsToPath(pe.points, cornerRadius)
       continue
     }
@@ -826,9 +953,22 @@ export function computeLayout(
     }
   }
 
+  // Alias lanes / around-the-side climbs can extend past dagre’s node bbox.
   const graphData = g.graph() as { width?: number; height?: number }
-  const width = (graphData.width ?? 600) + PADDING
-  const height = (graphData.height ?? 600) + PADDING
+  let width = graphData.width ?? 600
+  let height = graphData.height ?? 600
+  for (const n of positionedNodes) {
+    width = Math.max(width, n.x + n.width)
+    height = Math.max(height, n.y + n.height)
+  }
+  for (const pe of positionedEdges) {
+    for (const p of pe.points) {
+      width = Math.max(width, p.x)
+      height = Math.max(height, p.y)
+    }
+  }
+  width += PADDING
+  height += PADDING
 
   return { nodes: positionedNodes, edges: positionedEdges, width, height, cornerRadius }
 }

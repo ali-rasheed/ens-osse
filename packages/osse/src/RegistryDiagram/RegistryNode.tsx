@@ -213,7 +213,7 @@ export function RegistryNode({
       <div
         style={{
           fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-          fontWeight: 500,
+          fontWeight: 400,
           fontSize,
           letterSpacing: `${primaryLetterSpacing}em`,
           color,

@@ -138,7 +138,7 @@ function ResolverLayerFrame({
             justifyContent: "center",
             padding: `${paddingV}px ${paddingH}px`,
             fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-            fontWeight: 500,
+            fontWeight: 400,
             fontSize,
             letterSpacing: "0.05em",
             color: textColor,

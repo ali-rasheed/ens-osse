@@ -13,9 +13,44 @@ import { mergeNestedColumnDemoNodes } from "../../../../src/lib/nestedColumnDemo
 import {
   buildHierarchyEdgePolyline,
   computeLayout,
+  insertChamfer45,
   isHierarchySolidEdge,
+  OCTILINEAR_CHAMFER,
+  validateOctilinear,
 } from "./layout"
 import type { PositionedNode } from "./types"
+
+const PRESETS: Array<[string, () => ReturnType<typeof computeLayout>]> = [
+  [
+    "ensv2-alias-siblings",
+    () => {
+      const { nodes, edges } = parseMermaid(ENSV2_ALIAS_SIBLINGS_MERMAID)
+      return computeLayout(nodes, edges, defaultLayoutOptions)
+    },
+  ],
+  [
+    "classic-ens-tree",
+    () => {
+      const { nodes, edges } = parseMermaid(CLASSIC_ENS_TREE_MERMAID)
+      return computeLayout(nodes, edges, defaultLayoutOptions)
+    },
+  ],
+  [
+    "ensv2-delegated-records",
+    () => {
+      const { nodes, edges } = parseMermaid(ENSV2_DELEGATED_RECORDS_MERMAID)
+      return computeLayout(nodes, edges, defaultLayoutOptions)
+    },
+  ],
+  [
+    "nested-column",
+    () => {
+      const parsed = parseMermaid(NESTED_COLUMN_MERMAID)
+      const nodes = mergeNestedColumnDemoNodes(parsed.nodes, NESTED_COLUMN_MERMAID)
+      return computeLayout(nodes, parsed.edges, defaultLayoutOptions)
+    },
+  ],
+]
 
 const EPS = 1.5
 
@@ -95,7 +130,12 @@ describe("ENS v2 alias siblings — hierarchy and alias routing", () => {
     }
   })
 
-  it("routes sibling alias edges into prod top-center via a lane below nodes", () => {
+  it("keeps prod/dev/staging on the same rank (alias edges excluded from dagre)", () => {
+    const ranks = ["prod", "dev", "staging"].map((id) => nodeById.get(id)!.rank)
+    expect(new Set(ranks).size).toBe(1)
+  })
+
+  it("routes sibling alias edges into prod bottom-center via a lane below nodes", () => {
     const prod = nodeById.get("prod")!
 
     for (const sourceId of ["dev", "staging"]) {
@@ -104,10 +144,29 @@ describe("ENS v2 alias siblings — hierarchy and alias routing", () => {
       const maxBottom = Math.max(source.y + source.height, prod.y + prod.height)
 
       expectBottomCenter(pe.points[0], source)
-      expectTopCenter(pe.points[pe.points.length - 1], prod)
+      expectBottomCenter(pe.points[pe.points.length - 1], prod)
 
       const interiorMaxY = Math.max(...pe.points.slice(1, -1).map((p) => p.y), -Infinity)
       expect(interiorMaxY).toBeGreaterThan(maxBottom - EPS)
+
+      // Interior vertices must stay outside the target frame (endpoint may sit on the bottom edge).
+      for (const p of pe.points.slice(0, -1)) {
+        const insideX = p.x > prod.x + EPS && p.x < prod.x + prod.width - EPS
+        const insideY = p.y > prod.y + EPS && p.y < prod.y + prod.height - EPS
+        expect(insideX && insideY).toBe(false)
+      }
+    }
+  })
+
+  it("does not route workemon→prod through the middle of a sibling node", () => {
+    const pe = edgeByKey(layout, "workemon", "prod")
+    for (const siblingId of ["dev", "staging"]) {
+      const sibling = nodeById.get(siblingId)!
+      for (const p of pe.points) {
+        const insideX = p.x > sibling.x + EPS && p.x < sibling.x + sibling.width - EPS
+        const insideY = p.y > sibling.y + EPS && p.y < sibling.y + sibling.height - EPS
+        expect(insideX && insideY).toBe(false)
+      }
     }
   })
 })
@@ -179,4 +238,203 @@ describe("nested column — compound registry smoke", () => {
       expect(Number.isNaN(p.y)).toBe(false)
     }
   })
+})
+
+describe("validateOctilinear — vocabulary invariant", () => {
+  it("accepts trivial and pure axis-aligned paths", () => {
+    expect(validateOctilinear([]).ok).toBe(true)
+    expect(validateOctilinear([{ x: 0, y: 0 }]).ok).toBe(true)
+    expect(validateOctilinear([{ x: 0, y: 0 }, { x: 0, y: 10 }]).ok).toBe(true)
+    expect(
+      validateOctilinear([
+        { x: 0, y: 0 },
+        { x: 0, y: 10 },
+        { x: 20, y: 10 },
+        { x: 20, y: 30 },
+      ]).ok
+    ).toBe(true)
+  })
+
+  it("accepts a 45° leg sandwiched by axis-aligned legs", () => {
+    expect(
+      validateOctilinear([
+        { x: 0, y: 0 },
+        { x: 0, y: 10 },
+        { x: 10, y: 20 },
+        { x: 30, y: 20 },
+      ]).ok
+    ).toBe(true)
+  })
+
+  it("rejects an off-grid (non-45°) diagonal", () => {
+    const res = validateOctilinear([
+      { x: 0, y: 0 },
+      { x: 0, y: 10 },
+      { x: 30, y: 20 },
+      { x: 30, y: 40 },
+    ])
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/45/)
+  })
+
+  it("rejects a 45° leg as the first or last (port approach) leg", () => {
+    expect(
+      validateOctilinear([
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+        { x: 30, y: 10 },
+      ]).ok
+    ).toBe(false)
+    expect(
+      validateOctilinear([
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 30, y: 10 },
+      ]).ok
+    ).toBe(false)
+  })
+
+  it("rejects two consecutive 45° legs (must join an axis leg at both ends)", () => {
+    const res = validateOctilinear([
+      { x: 0, y: 0 },
+      { x: 0, y: 10 },
+      { x: 10, y: 20 },
+      { x: 20, y: 30 },
+      { x: 20, y: 40 },
+    ])
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/sandwiched/)
+  })
+})
+
+describe("insertChamfer45 — chamfer helper", () => {
+  it("is a no-op when chamfer <= 0 or too few points", () => {
+    const l = [
+      { x: 0, y: 0 },
+      { x: 0, y: 20 },
+      { x: 20, y: 20 },
+    ]
+    expect(insertChamfer45(l, 0)).toEqual(l)
+    expect(insertChamfer45(l.slice(0, 2), 8)).toEqual(l.slice(0, 2))
+  })
+
+  it("replaces a 90° bend with a symmetric 45° leg and preserves endpoints", () => {
+    const l = [
+      { x: 0, y: 0 },
+      { x: 0, y: 40 },
+      { x: 40, y: 40 },
+    ]
+    const out = insertChamfer45(l, 8)
+    expect(out[0]).toEqual(l[0])
+    expect(out[out.length - 1]).toEqual(l[2])
+    expect(out).toHaveLength(4)
+    // The two chamfer points straddle the corner by an equal retreat → exactly 45°.
+    expect(out[1]).toMatchObject({ x: 0, y: 32 })
+    expect(out[2]).toMatchObject({ x: 8, y: 40 })
+    expect(validateOctilinear(out).ok).toBe(true)
+  })
+
+  it("clamps the chamfer to half of each adjoining leg", () => {
+    const l = [
+      { x: 0, y: 0 },
+      { x: 0, y: 10 },
+      { x: 10, y: 10 },
+    ]
+    const out = insertChamfer45(l, 100)
+    expect(out[1]).toMatchObject({ x: 0, y: 5 })
+    expect(out[2]).toMatchObject({ x: 5, y: 10 })
+    expect(validateOctilinear(out).ok).toBe(true)
+  })
+
+  it("chamfers the hierarchy vhv polyline into an octilinear path with intact ports", () => {
+    const from: PositionedNode = {
+      id: "a",
+      title: "a",
+      type: "registry",
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 40,
+      rank: 0,
+    }
+    const to: PositionedNode = {
+      id: "b",
+      title: "b",
+      type: "registry",
+      x: 120,
+      y: 160,
+      width: 80,
+      height: 40,
+      rank: 1,
+    }
+    const base = buildHierarchyEdgePolyline(from, to, "vhv")
+    const chamfered = insertChamfer45(base, OCTILINEAR_CHAMFER)
+    expect(chamfered[0]).toEqual(base[0])
+    expect(chamfered[chamfered.length - 1]).toEqual(base[base.length - 1])
+    expect(chamfered.length).toBeGreaterThan(base.length)
+    expect(validateOctilinear(chamfered).ok).toBe(true)
+    // A genuine 45° leg is present.
+    const has45 = chamfered.slice(1).some((p, i) => {
+      const a = chamfered[i]
+      const adx = Math.abs(p.x - a.x)
+      const ady = Math.abs(p.y - a.y)
+      return adx > 1 && ady > 1 && Math.abs(adx - ady) < 1
+    })
+    expect(has45).toBe(true)
+  })
+})
+
+describe("octilinear preset regression matrix", () => {
+  for (const [name, build] of PRESETS) {
+    it(`${name}: every default edge polyline is octilinear`, () => {
+      const layout = build()
+      for (const e of layout.edges) {
+        const res = validateOctilinear(e.points)
+        expect(res.ok, `${name} ${e.from}→${e.to}: ${res.reason ?? ""}`).toBe(true)
+      }
+    })
+  }
+
+  for (const [name] of PRESETS) {
+    it(`${name}: chamfered layout stays octilinear with intact ports and finite points`, () => {
+      const parsed =
+        name === "nested-column"
+          ? (() => {
+              const p = parseMermaid(NESTED_COLUMN_MERMAID)
+              return {
+                nodes: mergeNestedColumnDemoNodes(p.nodes, NESTED_COLUMN_MERMAID),
+                edges: p.edges,
+              }
+            })()
+          : parseMermaid(
+              name === "ensv2-alias-siblings"
+                ? ENSV2_ALIAS_SIBLINGS_MERMAID
+                : name === "classic-ens-tree"
+                  ? CLASSIC_ENS_TREE_MERMAID
+                  : ENSV2_DELEGATED_RECORDS_MERMAID
+            )
+      const plain = computeLayout(parsed.nodes, parsed.edges, defaultLayoutOptions)
+      const chamfered = computeLayout(parsed.nodes, parsed.edges, {
+        ...defaultLayoutOptions,
+        chamfer: OCTILINEAR_CHAMFER,
+      })
+
+      expect(chamfered.edges).toHaveLength(plain.edges.length)
+      for (let i = 0; i < chamfered.edges.length; i++) {
+        const ce = chamfered.edges[i]
+        const pe = plain.edges[i]
+        const res = validateOctilinear(ce.points)
+        expect(res.ok, `${name} ${ce.from}→${ce.to}: ${res.reason ?? ""}`).toBe(true)
+        for (const p of ce.points) {
+          expect(Number.isNaN(p.x)).toBe(false)
+          expect(Number.isNaN(p.y)).toBe(false)
+        }
+        // Ports (endpoints) are unchanged by chamfering.
+        expect(ce.points[0].x).toBeCloseTo(pe.points[0].x, 3)
+        expect(ce.points[0].y).toBeCloseTo(pe.points[0].y, 3)
+        expect(ce.points[ce.points.length - 1].x).toBeCloseTo(pe.points[pe.points.length - 1].x, 3)
+        expect(ce.points[ce.points.length - 1].y).toBeCloseTo(pe.points[pe.points.length - 1].y, 3)
+      }
+    })
+  }
 })

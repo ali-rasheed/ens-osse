@@ -22,7 +22,7 @@ export interface NodeData {
   slots?: string[]
   /**
    * `registry` only: nested nodes drawn inside this frame (vertical stack; Figma nested Registry).
-   * When `children?.length` is set, `slots` is ignored for layout/render. Not represented in Mermaid v1.
+   * When `children?.length` is set, `slots` is ignored for layout/render. Express via `subgraph` / `end` in Mermaid.
    */
   children?: NodeData[]
   /**

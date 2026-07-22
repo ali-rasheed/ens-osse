@@ -15,6 +15,7 @@ import {
   resolveAnimationConfig,
 } from "./animationConfig"
 import { computeLayout } from "./layout"
+import type { GraphDirection } from "../mermaid"
 import { RegistryNode } from "./RegistryNode"
 import { PillNode } from "./PillNode"
 import { ResolverNode } from "./ResolverNode"
@@ -25,12 +26,14 @@ interface Props {
   edges: EdgeData[]
   animation?: AnimationConfig
   config?: DiagramConfig
+  /** Dagre rank direction from parsed Mermaid `graph TD|LR|…`. */
+  direction?: GraphDirection
   /** Directed shortest-path pulse; disabled when `prefers-reduced-motion` is set. */
   pathPulse?: PathPulseConfig | null
 }
 
 export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function RegistryDiagram(
-  { nodes, edges, animation = {}, config = {}, pathPulse = null },
+  { nodes, edges, animation = {}, config = {}, direction, pathPulse = null },
   ref
 ) {
   const {
@@ -198,6 +201,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
         ranksep,
         nodesep,
         cornerRadius,
+        direction,
         fontSize,
         paddingH,
         paddingV,
@@ -216,6 +220,7 @@ export const RegistryDiagram = forwardRef<HTMLDivElement, Props>(function Regist
     [
       nodes,
       edges,
+      direction,
       ranksep,
       nodesep,
       cornerRadius,

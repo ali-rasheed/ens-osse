@@ -52,6 +52,8 @@ export const ALIAS_ROUTING = {
   sideStub: 28,
   /** Lane Y as a fraction of the gap between source bottom and target top. */
   laneFill: 0.45,
+  /** Min clearance below the taller endpoint before the first alias lane (fits edge-label chips). */
+  belowClearance: 28,
 } as const
 
 export function isAliasRouteEdge(edge: {

@@ -75,7 +75,9 @@ export function DiagramEdge({
   const arrowhead = showArrowhead ? getArrowheadPath(beforeEnd, end) : ""
   const arrow = buildArrowheadAnimation(delay, arrowDelayOffset, instantArrowhead)
 
-  const labelPos = edge.label ? midpointAlongPolyline(edge.points) : null
+  // Prefer the longest horizontal run so alias labels sit on the below-lane, not on the
+  // vertical stub that approaches the target (which used to land on node content).
+  const labelPos = edge.label ? labelAnchorAlongPolyline(edge.points) : null
 
   return (
     <g>
@@ -201,6 +203,7 @@ function EdgeLabelChip({
         fill={color}
         fontSize={fontSize}
         fontFamily="'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace"
+        fontWeight={400}
         letterSpacing={`${EDGE_LABEL.letterSpacing}em`}
       >
         {text}
@@ -230,6 +233,24 @@ function midpointAlongPolyline(points: { x: number; y: number }[]): { x: number;
     acc += segLen
   }
   return points[points.length - 1]
+}
+
+/** Midpoint of the longest near-horizontal segment, else path midpoint. */
+function labelAnchorAlongPolyline(points: { x: number; y: number }[]): { x: number; y: number } {
+  const EPS = 0.5
+  let bestLen = 0
+  let best: { x: number; y: number } | null = null
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]
+    const b = points[i]
+    const dx = Math.abs(b.x - a.x)
+    const dy = Math.abs(b.y - a.y)
+    if (dy < EPS && dx > bestLen) {
+      bestLen = dx
+      best = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+    }
+  }
+  return best ?? midpointAlongPolyline(points)
 }
 
 function getArrowheadPath(
