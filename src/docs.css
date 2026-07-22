@@ -1,0 +1,267 @@
+/**
+ * Docs site layout — readable prose, sticky TOC, hash-nav chrome.
+ * Theme tokens come from inline styles (APP_CHROME light); this file owns structure.
+ */
+
+.docs-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: "ABC Monument Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+.docs-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 28px;
+  background: color-mix(in srgb, #eeeded 92%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.docs-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  flex: 0 0 auto;
+}
+
+.docs-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.docs-nav-link {
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.docs-nav-link:hover {
+  opacity: 0.85;
+}
+
+.docs-back {
+  flex: 0 0 auto;
+  font-size: 13px;
+  text-decoration: none;
+  font-family: "ABC Monument Grotesk Semi-Mono", ui-monospace, monospace;
+}
+
+.docs-back:hover {
+  text-decoration: underline;
+}
+
+.docs-body {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 720px);
+  gap: 40px;
+  justify-content: center;
+  padding: 32px 28px 80px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.docs-toc {
+  position: sticky;
+  top: 72px;
+  align-self: start;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+}
+
+.docs-toc-label {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: "ABC Monument Grotesk Semi-Mono", ui-monospace, monospace;
+}
+
+.docs-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.docs-toc li[data-level="3"] a {
+  padding-left: 12px;
+  font-size: 12px;
+}
+
+.docs-toc a {
+  display: block;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 4px 0;
+}
+
+.docs-toc a.is-active {
+  font-weight: 500;
+}
+
+.docs-article {
+  min-width: 0;
+}
+
+.docs-lede {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.5;
+  font-family: "ABC Marist", Georgia, serif;
+}
+
+.docs-prose {
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.docs-prose > :first-child {
+  margin-top: 0;
+}
+
+.docs-prose h1 {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  margin: 0 0 16px;
+}
+
+.docs-prose h2 {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 40px 0 12px;
+  padding-top: 8px;
+  scroll-margin-top: 80px;
+}
+
+.docs-prose h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 28px 0 8px;
+  scroll-margin-top: 80px;
+}
+
+.docs-prose p,
+.docs-prose ul,
+.docs-prose ol,
+.docs-prose table {
+  margin: 0 0 14px;
+}
+
+.docs-prose a {
+  color: #0082bb;
+}
+
+.docs-prose code {
+  font-family: "ABC Monument Grotesk Semi-Mono", ui-monospace, monospace;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.docs-prose pre {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: #191919;
+  color: #eeeded;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.docs-prose pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+.docs-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.docs-prose th,
+.docs-prose td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  vertical-align: top;
+}
+
+.docs-prose th {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.docs-prose blockquote {
+  margin: 0 0 14px;
+  padding: 8px 14px;
+  border-left: 3px solid color-mix(in srgb, currentColor 25%, transparent);
+  color: var(--docs-muted);
+}
+
+.docs-prose hr {
+  border: none;
+  border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  margin: 28px 0;
+}
+
+@media (max-width: 860px) {
+  .docs-body {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 24px 18px 64px;
+  }
+
+  .docs-toc {
+    position: static;
+    max-height: none;
+    padding-bottom: 8px;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  }
+
+  .docs-toc ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+  }
+
+  .docs-toc li[data-level="3"] {
+    display: none;
+  }
+
+  .docs-header {
+    padding: 10px 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}

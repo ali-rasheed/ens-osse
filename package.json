@@ -18,11 +18,13 @@
   "dependencies": {
     "@ensdomains/osse": "*",
     "dialkit": "^1.3.0",
+    "marked": "^18.0.6",
     "motion": "^11",
     "react": "^18",
     "react-dom": "^18"
   },
   "devDependencies": {
+    "@types/marked": "^5.0.2",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^4",

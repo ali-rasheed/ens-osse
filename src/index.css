@@ -73,18 +73,21 @@
 }
 
 /* Native disclosure: custom caret (summary uses list-style: none inline). */
-.mermaid-onboarding summary::-webkit-details-marker {
+.mermaid-onboarding summary::-webkit-details-marker,
+.aside-embed summary::-webkit-details-marker {
   display: none;
 }
 
-.mermaid-onboarding summary::before {
+.mermaid-onboarding summary::before,
+.aside-embed summary::before {
   content: "▸ ";
   display: inline-block;
   transform: rotate(0deg);
   transition: transform 0.15s ease;
 }
 
-.mermaid-onboarding[open] summary::before {
+.mermaid-onboarding[open] summary::before,
+.aside-embed[open] summary::before {
   transform: rotate(90deg);
 }
 

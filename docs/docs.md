@@ -2,7 +2,7 @@
 
 Interactive editor for **ENS Diagram System** registry diagrams. You write Mermaid-like graph source; the app lays out nodes, routes arrows, and exports PNG or MDX embed snippets.
 
-This guide is for **people using the app**. Syntax details live in [mermaid-patterns.md](./mermaid-patterns.md). Maintainers: see [devrel.md](./devrel.md).
+This guide is for **people using the app**. In the playground, open **Docs** (header or editor panel) for the rendered site at `#/docs`. Syntax details also live in [mermaid-patterns.md](./mermaid-patterns.md). Maintainers: see [devrel.md](./devrel.md).
 
 ---
 
@@ -110,7 +110,7 @@ Alias edges (`-. alias .->`) always use the dedicated alias router; `route=` doe
 
 Copy the **Docs embed (MDX)** snippet from the right panel. Payload schema: `ens-osse/v1` (see [naming.md](./naming.md)) with `mermaid`, `mode`, and optional `caption`.
 
-Use `<OsseEmbed mermaid={…} mode="…" />` from `@ensdomains/osse`, or fence source as ` ```osse ` with the remark plugin `@ensdomains/osse/remark`. Optional YAML frontmatter (`theme`, `animation`, `pulse`, `fit`) is documented in [mermaid-patterns.md](./mermaid-patterns.md#yaml-frontmatter-document-config).
+Use `<OsseEmbed mermaid={…} mode="…" />` from `@ensdomains/osse`, or fence source as ` ```osse ` with the remark plugin `@ensdomains/osse/remark`. Optional YAML frontmatter (`theme`, `animation`, `pulse`, `fit`, `strict`) is documented in [mermaid-patterns.md](./mermaid-patterns.md#yaml-frontmatter-document-config).
 
 **Nested column caveat:** the live demo merges JSON `children` onto `registry-root` for the nested-column preset. Mermaid alone cannot express nested registries — docs consumers need the same merge or raw `NodeData[]`. See [mermaid-patterns.md § Nested registries](./mermaid-patterns.md#nested-registries).
 
@@ -120,8 +120,8 @@ Use `<OsseEmbed mermaid={…} mode="…" />` from `@ensdomains/osse`, or fence s
 
 | Symptom | Fix |
 |---------|-----|
-| **parse error** in Mermaid header | Check node ids, brackets, and link tokens against [mermaid-patterns.md](./mermaid-patterns.md) |
-| Unexpected plain registry node | Undeclared ids on edges become registries — declare nodes explicitly |
+| **parse error** in Mermaid header | Check node ids, brackets, and link tokens against [mermaid-patterns.md](./mermaid-patterns.md); see the diagnostics list under the editor for the exact line/column |
+| Unexpected plain registry node | Undeclared ids on edges become registries — declare nodes explicitly, or turn on **Strict** (editor checkbox or frontmatter `strict: true`) to make it a parse error — see [Strict mode & diagnostics](./mermaid-patterns.md#strict-mode--diagnostics) |
 | Nested frame missing children | Use the nested-column template or supply `NodeData.children` in app data |
 | `route=` has no effect on alias | By design — alias routing is automatic |
 
@@ -129,6 +129,7 @@ Use `<OsseEmbed mermaid={…} mode="…" />` from `@ensdomains/osse`, or fence s
 
 ## Further reading
 
+- In-app docs: `#/docs` (Guide), `#/docs/syntax`, `#/docs/naming`, `#/docs/packaging`
 - [mermaid-patterns.md](./mermaid-patterns.md) — syntax and automatic layout appendix
 - [devrel.md](./devrel.md) — release and embed checklist
 - [packaging.md](./packaging.md) — npm library roadmap

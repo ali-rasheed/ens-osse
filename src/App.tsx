@@ -2,7 +2,7 @@
  * App shell: DialKit geometry + Mermaid source, theme modes (Figma tokens), docs embed snippet,
  * and retina PNG export of the diagram canvas only.
  */
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback, type CSSProperties } from "react"
 import { motion } from "motion/react"
 import { DialRoot, useDialKit } from "dialkit"
 import "dialkit/styles.css"
@@ -23,6 +23,7 @@ import {
   type PathPulseConfig,
   type DiagramMode,
   type ExportScale,
+  type ParseDiagnostic,
 } from "@ensdomains/osse"
 import {
   MERMAID_TEMPLATES,
@@ -30,10 +31,9 @@ import {
   findTemplateIdForSource,
   type MermaidTemplate,
 } from "./lib/mermaidTemplates"
-import mermaidPatternsSource from "../docs/mermaid-patterns.md?raw"
-import userGuideSource from "../docs/docs.md?raw"
 import { buildDocsEmbedSnippet } from "./lib/docsEmbed"
 import { mergeNestedColumnDemoNodes } from "./lib/nestedColumnDemoData"
+import { docsHref } from "./DocsPage"
 
 /** Initial editor: nested preset; bundled JSON children merge in `mergeNestedColumnDemoNodes`. */
 const DEFAULT_MERMAID = NESTED_COLUMN_MERMAID
@@ -53,11 +53,6 @@ function readDialKitOpenPreference(): boolean {
     /* ignore */
   }
   return true
-}
-
-/** Drop the doc H1 so the panel doesn’t repeat the disclosure title. */
-function mermaidDocPanelBody(md: string): string {
-  return md.replace(/^#[^\n]*\n+/, "").trimStart()
 }
 
 /**
@@ -298,7 +293,8 @@ export default function App() {
   ])
 
   const [mermaid, setMermaid] = useState(DEFAULT_MERMAID)
-  const parsed = useMemo(() => parseMermaid(mermaid), [mermaid])
+  const [strictMode, setStrictMode] = useState(false)
+  const parsed = useMemo(() => parseMermaid(mermaid, { strict: strictMode }), [mermaid, strictMode])
   const diagramNodes = useMemo(
     () => mergeNestedColumnDemoNodes(parsed.nodes, mermaid),
     [parsed.nodes, mermaid]
@@ -419,6 +415,10 @@ export default function App() {
           padding: "12px 20px",
           borderBottom: chrome.asideBorder,
           background: chrome.shellBg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
         }}
       >
         <h1
@@ -438,6 +438,23 @@ export default function App() {
           <EnsMarkLogo size={28} />
           ENS Ossë
         </h1>
+        <a
+          href={docsHref("guide")}
+          style={{
+            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+            fontSize: 12,
+            fontWeight: 400,
+            letterSpacing: "0.02em",
+            color: chrome.textMuted,
+            textDecoration: "none",
+            padding: "6px 10px",
+            borderRadius: 8,
+            border: chrome.panelBorder,
+            background: chrome.panelBg,
+          }}
+        >
+          Docs
+        </a>
       </header>
 
       <div
@@ -511,41 +528,55 @@ export default function App() {
             width: 380,
             flex: "0 0 380px",
             height: "auto",
-            maxHeight: "100vh",
+            maxHeight: "calc(100vh - 56px)",
             overflowY: "auto",
             overflowX: "hidden",
             boxSizing: "border-box",
-            padding: 16,
+            padding: "12px 12px 16px",
             display: "flex",
             flexDirection: "column",
             alignItems: "stretch",
-            gap: 12,
+            gap: 10,
             background: chrome.asideBg,
             borderLeft: chrome.asideBorder,
             boxShadow: chrome.asideShadow,
           }}
         >
-          <ModeSwitch mode={mode} onChange={setMode} chrome={chrome} />
-          <ReplayButton onClick={replay} chrome={chrome} />
-          <ExportPanel
-            chrome={chrome}
-            exportScale={exportScale}
-            onScaleChange={setExportScale}
-            onExportPng={handleExportPng}
-          />
-          <EmbedPanel
-            chrome={chrome}
-            snippet={embedSnippet}
-            copied={embedCopied}
-            onCopy={handleCopyEmbed}
-          />
+          {/* Theme + replay — one quiet toolbar, not stacked cards. */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexShrink: 0,
+            }}
+          >
+            <ModeSwitch mode={mode} onChange={setMode} chrome={chrome} />
+            <ReplayButton onClick={replay} chrome={chrome} />
+          </div>
+
+          {/* Source editor is the primary job of this panel. */}
           <MermaidInput
             value={mermaid}
             onChange={setMermaid}
             error={parsed.error}
+            diagnostics={parsed.diagnostics}
+            strict={strictMode}
+            onStrictChange={setStrictMode}
             chrome={chrome}
             templates={MERMAID_TEMPLATES}
             onReplay={replay}
+          />
+
+          {/* Export / embed — secondary, shared surface. */}
+          <SharePanel
+            chrome={chrome}
+            exportScale={exportScale}
+            onScaleChange={setExportScale}
+            onExportPng={handleExportPng}
+            snippet={embedSnippet}
+            copied={embedCopied}
+            onCopy={handleCopyEmbed}
           />
         </aside>
       </div>
@@ -650,7 +681,7 @@ function DialKitPanel({
               style={{
                 fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
                 fontSize: 11,
-                fontWeight: 600,
+                fontWeight: 400,
                 letterSpacing: 0.3,
                 color: chrome.textMuted,
                 marginBottom: 10,
@@ -665,6 +696,16 @@ function DialKitPanel({
     </motion.aside>
   )
 }
+
+/** Shared mono label style for aside controls. */
+const ASIDE_LABEL: CSSProperties = {
+  fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+  fontSize: 11,
+  fontWeight: 400,
+  letterSpacing: 0.3,
+}
+
+const ASIDE_RADIUS = 4
 
 function ModeSwitch({
   mode,
@@ -681,8 +722,13 @@ function ModeSwitch({
       aria-label="Theme mode"
       style={{
         display: "flex",
-        gap: 6,
-        width: "100%",
+        flex: 1,
+        minWidth: 0,
+        gap: 2,
+        padding: 2,
+        borderRadius: ASIDE_RADIUS,
+        border: chrome.panelBorder,
+        background: chrome.panelBg,
       }}
     >
       {MODES.map((m) => {
@@ -694,16 +740,17 @@ function ModeSwitch({
             onClick={() => onChange(m)}
             style={{
               flex: 1,
-              padding: "8px 6px",
-              borderRadius: 8,
-              border: chrome.panelBorder,
-              background: active ? chrome.panelBg : "transparent",
-              color: chrome.text,
-              boxShadow: active ? "0 2px 8px rgba(0,0,0,0.12)" : "none",
+              padding: "6px 4px",
+              borderRadius: ASIDE_RADIUS - 1,
+              border: "none",
+              background: active
+                ? "color-mix(in srgb, currentColor 12%, transparent)"
+                : "transparent",
+              color: active ? chrome.text : chrome.textMuted,
               fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
               fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: 0.4,
+              fontWeight: 400,
+              letterSpacing: 0.3,
               textTransform: "capitalize",
               cursor: "pointer",
             }}
@@ -712,170 +759,6 @@ function ModeSwitch({
           </button>
         )
       })}
-    </div>
-  )
-}
-
-function ExportPanel({
-  chrome,
-  exportScale,
-  onScaleChange,
-  onExportPng,
-}: {
-  chrome: (typeof APP_CHROME_BY_MODE)[DiagramMode]
-  exportScale: ExportScale
-  onScaleChange: (s: ExportScale) => void
-  onExportPng: () => void
-}) {
-  const scales: ExportScale[] = [1, 2, 3]
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        padding: 12,
-        background: chrome.panelBg,
-        border: chrome.panelBorder,
-        borderRadius: 10,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-          fontSize: 11,
-          fontWeight: 600,
-          color: chrome.text,
-          letterSpacing: 0.3,
-        }}
-      >
-        Export PNG
-      </div>
-      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {scales.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => onScaleChange(s)}
-            style={{
-              flex: 1,
-              padding: "6px 0",
-              borderRadius: 6,
-              border: chrome.panelBorder,
-              background: exportScale === s ? chrome.panelBg : "transparent",
-              color: chrome.text,
-              fontFamily: "system-ui, sans-serif",
-              fontSize: 12,
-              fontWeight: exportScale === s ? 700 : 500,
-              cursor: "pointer",
-            }}
-          >
-            {s}x
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        onClick={onExportPng}
-        style={{
-          width: "100%",
-          padding: "8px 12px",
-          borderRadius: 8,
-          border: chrome.panelBorder,
-          background: chrome.panelBg,
-          color: chrome.text,
-          fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        Download diagram PNG
-      </button>
-    </div>
-  )
-}
-
-function EmbedPanel({
-  chrome,
-  snippet,
-  copied,
-  onCopy,
-}: {
-  chrome: (typeof APP_CHROME_BY_MODE)[DiagramMode]
-  snippet: string
-  copied: boolean
-  onCopy: () => void
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        padding: 12,
-        background: chrome.panelBg,
-        border: chrome.panelBorder,
-        borderRadius: 10,
-        minHeight: 0,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-            fontSize: 11,
-            fontWeight: 600,
-            color: chrome.text,
-            letterSpacing: 0.3,
-          }}
-        >
-          Docs embed (MDX)
-        </span>
-        <button
-          type="button"
-          onClick={onCopy}
-          style={{
-            padding: "4px 10px",
-            borderRadius: 6,
-            border: chrome.panelBorder,
-            background: "transparent",
-            color: chrome.textMuted,
-            fontSize: 11,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
-      <textarea
-        readOnly
-        value={snippet}
-        spellCheck={false}
-        aria-label="MDX embed snippet"
-        style={{
-          width: "100%",
-          height: 120,
-          resize: "vertical",
-          boxSizing: "border-box",
-          padding: 8,
-          borderRadius: 6,
-          border: chrome.panelBorder,
-          background: "transparent",
-          color: chrome.textMuted,
-          fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-          fontSize: 10,
-          lineHeight: 1.45,
-        }}
-      />
     </div>
   )
 }
@@ -891,22 +774,23 @@ function ReplayButton({
     <button
       type="button"
       onClick={onClick}
+      aria-label="Replay animation"
+      title="Replay"
       style={{
-        display: "flex",
+        display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
-        width: "100%",
-        padding: "8px 14px",
+        gap: 6,
+        flex: "0 0 auto",
+        height: 32,
+        padding: "0 10px",
         background: chrome.panelBg,
         color: chrome.text,
         border: chrome.panelBorder,
-        borderRadius: 8,
-        backdropFilter: "blur(8px)",
-        boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
+        borderRadius: ASIDE_RADIUS,
         fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-        fontSize: 12,
-        fontWeight: 500,
+        fontSize: 11,
+        fontWeight: 400,
         letterSpacing: 0.3,
         cursor: "pointer",
       }}
@@ -933,10 +817,181 @@ function ReplayButton({
   )
 }
 
+/**
+ * Secondary share surface: PNG scale + download, with embed snippet behind a disclosure.
+ * Keeps export/embed from competing with the Mermaid editor above.
+ */
+function SharePanel({
+  chrome,
+  exportScale,
+  onScaleChange,
+  onExportPng,
+  snippet,
+  copied,
+  onCopy,
+}: {
+  chrome: (typeof APP_CHROME_BY_MODE)[DiagramMode]
+  exportScale: ExportScale
+  onScaleChange: (s: ExportScale) => void
+  onExportPng: () => void
+  snippet: string
+  copied: boolean
+  onCopy: () => void
+}) {
+  const scales: ExportScale[] = [1, 2, 3]
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        padding: 10,
+        background: chrome.panelBg,
+        border: chrome.panelBorder,
+        borderRadius: ASIDE_RADIUS,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <span style={{ ...ASIDE_LABEL, color: chrome.textMuted }}>Export</span>
+        <div
+          role="group"
+          aria-label="PNG scale"
+          style={{
+            display: "flex",
+            gap: 2,
+            padding: 2,
+            borderRadius: ASIDE_RADIUS,
+            border: chrome.panelBorder,
+          }}
+        >
+          {scales.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onScaleChange(s)}
+              style={{
+                minWidth: 32,
+                padding: "4px 6px",
+                borderRadius: ASIDE_RADIUS - 1,
+                border: "none",
+                background:
+                  exportScale === s
+                    ? "color-mix(in srgb, currentColor 12%, transparent)"
+                    : "transparent",
+                color: exportScale === s ? chrome.text : chrome.textMuted,
+                fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+                fontSize: 11,
+                fontWeight: 400,
+                cursor: "pointer",
+              }}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onExportPng}
+        style={{
+          width: "100%",
+          padding: "7px 10px",
+          borderRadius: ASIDE_RADIUS,
+          border: chrome.panelBorder,
+          background: "transparent",
+          color: chrome.text,
+          fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+          fontSize: 12,
+          fontWeight: 400,
+          cursor: "pointer",
+        }}
+      >
+        Download PNG
+      </button>
+      <details className="aside-embed">
+        <summary
+          style={{
+            ...ASIDE_LABEL,
+            color: chrome.textMuted,
+            cursor: "pointer",
+            listStyle: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            paddingTop: 2,
+          }}
+        >
+          <span>Docs embed</span>
+          <span style={{ fontWeight: 400, fontSize: 10 }}>MDX</span>
+        </summary>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            marginTop: 8,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={onCopy}
+              style={{
+                padding: "3px 8px",
+                borderRadius: ASIDE_RADIUS,
+                border: chrome.panelBorder,
+                background: "transparent",
+                color: chrome.textMuted,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={snippet}
+            spellCheck={false}
+            aria-label="MDX embed snippet"
+            style={{
+              width: "100%",
+              height: 96,
+              resize: "vertical",
+              boxSizing: "border-box",
+              padding: 8,
+              borderRadius: ASIDE_RADIUS,
+              border: chrome.panelBorder,
+              background: "transparent",
+              color: chrome.textMuted,
+              fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+              fontSize: 10,
+              lineHeight: 1.45,
+            }}
+          />
+        </div>
+      </details>
+    </div>
+  )
+}
+
 interface MermaidInputProps {
   value: string
   onChange: (next: string) => void
   error?: string
+  diagnostics?: ParseDiagnostic[]
+  strict: boolean
+  onStrictChange: (next: boolean) => void
   chrome: (typeof APP_CHROME_BY_MODE)[DiagramMode]
   templates: MermaidTemplate[]
   onReplay?: () => void
@@ -946,6 +1001,9 @@ function MermaidInput({
   value,
   onChange,
   error,
+  diagnostics,
+  strict,
+  onStrictChange,
   chrome,
   templates,
   onReplay,
@@ -959,65 +1017,80 @@ function MermaidInput({
   return (
     <div
       style={{
-        position: "sticky",
-        bottom: 0,
-        zIndex: 80,
-        width: "100%",
-        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        flex: "1 1 auto",
+        minHeight: 0,
         background: chrome.panelBg,
         border: chrome.panelBorder,
-        borderRadius: 10,
-        backdropFilter: "blur(8px)",
-        boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+        borderRadius: ASIDE_RADIUS,
         overflow: "hidden",
-        fontFamily: "system-ui, sans-serif",
       }}
     >
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
-          gap: 4,
-          padding: "10px 12px",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          padding: "8px 10px",
           borderBottom: chrome.panelBorder,
-          color: chrome.text,
-          fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: 0.2,
         }}
       >
-        <span>Mermaid</span>
-        <span
-          style={{
-            color: error ? chrome.errorText : chrome.textMuted,
-            fontSize: 11,
-            fontWeight: 400,
-            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-          }}
-        >
-          {error
-            ? "parse error"
-            : "[reg # frame=single]  (plain)  ((hatched))  {dashed # stack=N}"}
-        </span>
+        <span style={{ ...ASIDE_LABEL, color: chrome.text }}>Source</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              ...ASIDE_LABEL,
+              fontWeight: 400,
+              color: chrome.textMuted,
+              fontSize: 10,
+              cursor: "pointer",
+            }}
+            title="Error (not just warn) on node ids used in an edge but never declared with a shape"
+          >
+            <input
+              type="checkbox"
+              checked={strict}
+              onChange={(e) => onStrictChange(e.target.checked)}
+              style={{ margin: 0, cursor: "pointer" }}
+            />
+            Strict
+          </label>
+          <span
+            style={{
+              ...ASIDE_LABEL,
+              fontWeight: 400,
+              color: error ? chrome.errorText : chrome.textMuted,
+              fontSize: 10,
+            }}
+          >
+            {error
+              ? "parse error"
+              : diagnostics?.length
+                ? `${diagnostics.length} warning${diagnostics.length > 1 ? "s" : ""}`
+                : "Mermaid"}
+          </span>
+        </div>
       </div>
+
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "10px 12px",
+          gap: 8,
+          padding: "8px 10px",
           borderBottom: chrome.panelBorder,
-          flexWrap: "wrap",
         }}
       >
         <label
           htmlFor="mermaid-template-select"
           style={{
-            fontSize: 11,
-            fontWeight: 600,
+            ...ASIDE_LABEL,
             color: chrome.textMuted,
-            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
             flex: "0 0 auto",
           }}
         >
@@ -1036,19 +1109,19 @@ function MermaidInput({
           }}
           aria-label="Load a Mermaid preset"
           style={{
-            flex: "1 1 140px",
+            flex: "1 1 auto",
             minWidth: 0,
-            padding: "6px 8px",
-            borderRadius: 6,
+            padding: "5px 6px",
+            borderRadius: ASIDE_RADIUS,
             border: chrome.panelBorder,
             background: "transparent",
             color: chrome.text,
-            fontSize: 12,
+            fontSize: 11,
             fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
             cursor: "pointer",
           }}
         >
-          <option value="__none__">— Current source (no preset) —</option>
+          <option value="__none__">— Custom —</option>
           {templates.map((t) => (
             <option key={t.id} value={t.id}>
               {t.title}
@@ -1058,32 +1131,38 @@ function MermaidInput({
         {activeTemplate?.thumbnailSrc ? (
           <img
             src={activeTemplate.thumbnailSrc}
-            alt={`${activeTemplate.title} reference`}
-            width={72}
-            height={48}
+            alt=""
+            width={56}
+            height={36}
             style={{
               objectFit: "cover",
               objectPosition: "center top",
-              borderRadius: 6,
+              borderRadius: ASIDE_RADIUS,
               border: chrome.panelBorder,
               flex: "0 0 auto",
             }}
           />
         ) : null}
       </div>
+
       {activeTemplate?.description ? (
         <p
           style={{
             margin: 0,
-            padding: "0 12px 10px",
+            padding: "6px 10px 0",
             fontSize: 11,
-            lineHeight: 1.5,
+            lineHeight: 1.4,
             color: chrome.textMuted,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
           }}
         >
           {activeTemplate.description}
         </p>
       ) : null}
+
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -1093,129 +1172,125 @@ function MermaidInput({
         style={{
           display: "block",
           width: "100%",
+          flex: "1 1 auto",
+          minHeight: 200,
           height: 240,
           background: "transparent",
           color: chrome.text,
           fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
           fontSize: 12,
           lineHeight: 1.55,
-          padding: 12,
+          padding: 10,
           border: "none",
           outline: "none",
           resize: "vertical",
           boxSizing: "border-box",
         }}
       />
-      <details
-        className="mermaid-onboarding"
+
+      {diagnostics?.length ? (
+        <DiagnosticsList diagnostics={diagnostics} chrome={chrome} />
+      ) : null}
+
+      <div
         style={{
           borderTop: chrome.panelBorder,
-          padding: "0 12px 0",
-          margin: 0,
+          padding: "8px 10px 10px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
         }}
       >
-        <summary
-          style={{
-            listStyle: "none",
-            cursor: "pointer",
-            padding: "10px 0 8px",
-            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: 0.25,
-            color: chrome.textMuted,
-            userSelect: "none",
-          }}
+        <SyntaxCheatsheet chrome={chrome} />
+      </div>
+    </div>
+  )
+}
+
+/** Line-level parse diagnostics — errors and (non-strict) undeclared-id warnings, from `parseMermaid`. */
+function DiagnosticsList({
+  diagnostics,
+  chrome,
+}: {
+  diagnostics: ParseDiagnostic[]
+  chrome: (typeof APP_CHROME_BY_MODE)[DiagramMode]
+}) {
+  return (
+    <ul
+      style={{
+        margin: 0,
+        listStyle: "none",
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        padding: "8px 10px",
+        borderTop: chrome.panelBorder,
+        maxHeight: 96,
+        overflowY: "auto",
+        fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+        fontSize: 10.5,
+        lineHeight: 1.4,
+      }}
+    >
+      {diagnostics.map((d, i) => (
+        <li
+          key={`${d.line}:${d.column ?? 0}:${i}`}
+          style={{ color: d.severity === "error" ? chrome.errorText : chrome.textMuted }}
         >
-          How to use Ossë
-        </summary>
-        <div
-          style={{
-            paddingBottom: 12,
-            fontSize: 12,
-            lineHeight: 1.55,
-            color: chrome.textMuted,
-          }}
-        >
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-              fontSize: 11,
-              lineHeight: 1.5,
-              color: chrome.textMuted,
-              margin: 0,
-              padding: "10px 10px 8px",
-              maxHeight: 320,
-              overflowY: "auto",
-              borderRadius: 8,
-              border: chrome.panelBorder,
-              background: "color-mix(in srgb, currentColor 6%, transparent)",
-            }}
-          >
-            {mermaidDocPanelBody(userGuideSource)}
-          </pre>
-        </div>
-      </details>
-      <details
-        className="mermaid-onboarding"
+          <span style={{ fontWeight: 400 }}>
+            L{d.line}
+            {d.column != null ? `:${d.column}` : ""}
+          </span>{" "}
+          {d.message}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Compact while-you-type reference; full detail lives on the docs site. */
+function SyntaxCheatsheet({
+  chrome,
+}: {
+  chrome: (typeof APP_CHROME_BY_MODE)[DiagramMode]
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "baseline",
+        gap: "4px 10px",
+        fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
+        fontSize: 10.5,
+        lineHeight: 1.45,
+        color: chrome.textMuted,
+      }}
+    >
+      {(
+        [
+          ["[ ]", "registry"],
+          ["( )", "pill"],
+          ["(( ))", "hatched"],
+          ["{ }", "resolver"],
+        ] as const
+      ).map(([syntax, meaning]) => (
+        <span key={syntax} style={{ whiteSpace: "nowrap" }}>
+          <code style={{ color: chrome.text }}>{syntax}</code> {meaning}
+        </span>
+      ))}
+      <a
+        href={docsHref("syntax")}
         style={{
-          borderTop: chrome.panelBorder,
-          padding: "0 12px 12px",
-          margin: 0,
+          marginLeft: "auto",
+          color: chrome.text,
+          textDecoration: "none",
+          fontWeight: 400,
+          fontSize: 11,
         }}
       >
-        <summary
-          style={{
-            listStyle: "none",
-            cursor: "pointer",
-            padding: "10px 0 8px",
-            fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: 0.25,
-            color: chrome.textMuted,
-            userSelect: "none",
-          }}
-        >
-          Mermaid syntax reference
-        </summary>
-        <div
-          style={{
-            paddingBottom: 4,
-            fontSize: 12,
-            lineHeight: 1.55,
-            color: chrome.textMuted,
-          }}
-        >
-          <p style={{ margin: "0 0 10px" }}>
-            Live source:{" "}
-            <code style={{ color: chrome.text }}>docs/mermaid-patterns.md</code> (imported at build
-            time). Use the <strong style={{ color: chrome.text }}>Template</strong> dropdown for
-            presets. Invalid lines show a parse error in the header.
-          </p>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              fontFamily: "'ABC Monument Grotesk Semi-Mono', ui-monospace, monospace",
-              fontSize: 11,
-              lineHeight: 1.5,
-              color: chrome.textMuted,
-              margin: 0,
-              padding: "10px 10px 8px",
-              maxHeight: 380,
-              overflowY: "auto",
-              borderRadius: 8,
-              border: chrome.panelBorder,
-              background: "color-mix(in srgb, currentColor 6%, transparent)",
-            }}
-          >
-            {mermaidDocPanelBody(mermaidPatternsSource)}
-          </pre>
-        </div>
-      </details>
+        Docs →
+      </a>
     </div>
   )
 }
