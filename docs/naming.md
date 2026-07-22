@@ -10,7 +10,7 @@ No external npm consumers or published embed payloads exist yet, so all renames 
 | Layer | Name | Notes |
 |-------|------|--------|
 | **Product / UI** | **ENS Ossë** | Playground heading, user guide (`docs/docs.md`), marketing copy. Humans say “Ossë”. |
-| **GitHub repo** | `ens-osse` | Canonical remote (`ali-rasheed/ens-osse`). Local folder may still be `ens-diagrams` during transition. |
+| **GitHub repo** | `ens-osse` | Canonical remote (`ali-rasheed/ens-osse`). Local folder: `ens-osse`. |
 | **npm package** | `@ensdomains/osse` | Scoped publish target. Workspace folder: `packages/osse`. |
 | **Primary React export** | `OsseDiagram` | Replaces working title `RegistryDiagram` at package extraction. |
 | **Embed component** | `OsseEmbed` | MDX/docs consumer for fenced blocks + JSON payload. |

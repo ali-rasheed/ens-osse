@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Open the dev URL shown in the terminal (Portless: `http://ens-diagrams.localhost:1355` if configured).
+Open the dev URL shown in the terminal (Portless: `http://osse.localhost:1355` if configured).
 
 ---
 
