@@ -12,22 +12,23 @@ export interface MermaidTemplate {
 }
 
 /**
- * ENS v2 nested-column preset.
- * Top-level Mermaid edge remains canonical; comment lines mirror the injected nested `children` tree
- * so the editor source reflects the rendered diagram structure.
+ * ENS v2 nested-column preset — subgraph syntax maps to `registry-root.children`.
  */
 export const NESTED_COLUMN_MERMAID = `graph TD
-  registry-root[Registry] --> resolvers{Resolvers # stack=3}
-  %% nested children rendered inside registry-root:
-  %% <root> # frame=single | owner: 0x0123...
-  %% eth # frame=single | owner: 0x0123...
-  %% workemon.eth # frame=single | owner: 0x0123...
-  %% wallet.workemon.eth # frame=single
-  %%   - owner: 0x0123...
-  %%   - resolver: 0x6789... # dashed
-  %% delegate.workemon.eth # frame=single
-  %%   - owner: 0x0123...
-  %%   - resolver: 0x6789... # dashed`
+  subgraph registry-root[Registry]
+    nest-root[<root> # frame=single | owner: 0x0123...]
+    nest-eth[eth # frame=single | owner: 0x0123...]
+    nest-workemon[workemon.eth # frame=single | owner: 0x0123...]
+    subgraph nest-wallet[wallet.workemon.eth # frame=single]
+      w-owner(owner: 0x0123...)
+      w-res{resolver: 0x6789...}
+    end
+    subgraph nest-delegate[delegate.workemon.eth # frame=single]
+      d-owner(owner: 0x0123...)
+      d-res{resolver: 0x6789...}
+    end
+  end
+  registry-root --> resolvers{Resolvers # stack=3}`
 
 /**
  * Classic flat ENS-style registry tree: &lt;root&gt; → eth → workemon.eth with hatched slots,
@@ -104,7 +105,7 @@ export const MERMAID_TEMPLATES: MermaidTemplate[] = [
     id: "nested-column",
     title: "ENS v2 registry column",
     description:
-      "Registry shell with nested names (owner lines + resolver cards) and a stacked Resolvers node. Mermaid includes a commented hierarchy map; runtime still merges JSON children onto registry-root (see nestedColumnDemoData).",
+      "Registry shell with nested names (owner lines + resolver cards) and a stacked Resolvers node. Subgraph syntax maps to `registry-root.children`; JSON merge is a legacy fallback when children are absent.",
     thumbnailSrc: "/templates/nested-registry-ens-v2-reference.png",
     source: NESTED_COLUMN_MERMAID,
   },

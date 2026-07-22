@@ -22,6 +22,47 @@ interface ParsedLink {
   label?: string
 }
 
+/** A logical source line after comment/frontmatter stripping, carrying its position for diagnostics. */
+interface SourceLine {
+  text: string
+  /** 1-based line number in the original `parseMermaid` input (after any YAML frontmatter). */
+  line: number
+  /** 1-based column of `text[0]` within that original line. */
+  column: number
+}
+
+export interface ParseDiagnostic {
+  /** Human-readable message; also embedded (with position) in the legacy `error` string. */
+  message: string
+  /** 1-based line number within the diagram source (frontmatter lines count too). */
+  line: number
+  /** 1-based column, when practical to compute. */
+  column?: number
+  severity: "error" | "warning"
+}
+
+export interface ParseMermaidOptions {
+  /**
+   * Error (not just warn) on node ids referenced by an edge but never declared with a shape
+   * anywhere in the source — closes the "undeclared id silently creates a node" typo trap.
+   * Defaults to `false`, or to frontmatter `strict: true` when set. An explicit option here
+   * always overrides frontmatter.
+   */
+  strict?: boolean
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function formatDiagnostic(d: ParseDiagnostic): string {
+  return `Line ${d.line}${d.column != null ? `:${d.column}` : ""}: ${d.message}`
+}
+
+function formatDiagnostics(diags: ParseDiagnostic[]): string {
+  return diags.map(formatDiagnostic).join("\n")
+}
+
 /**
  * Split label/slots from trailing hash meta on the **last** whitespace + `#` + whitespace (e.g. ` # stack=3`).
  * Supports a line break before `#` (whitespace includes newlines).
@@ -69,8 +110,11 @@ function unquoteBracketBody(body: string): string {
   return s
 }
 
-/** Unclosed `{` on a line: merge following lines until braces balance (multiline `id{…}`). */
-function mergeLinesWithOpenBraces(lines: string[]): string[] {
+/**
+ * Unclosed `{` on a line: merge following lines until braces balance (multiline `id{…}`).
+ * A merged block keeps the position (line/column) of its first sub-line for diagnostics.
+ */
+function mergeLinesWithOpenBraces(lines: SourceLine[]): SourceLine[] {
   function braceDepth(s: string): number {
     let d = 0
     for (const c of s) {
@@ -79,24 +123,28 @@ function mergeLinesWithOpenBraces(lines: string[]): string[] {
     }
     return d
   }
-  const out: string[] = []
-  let acc = ""
+  const out: SourceLine[] = []
+  let acc: SourceLine | null = null
   for (const line of lines) {
-    if (/^(graph|flowchart)\b/i.test(line)) {
+    if (/^(graph|flowchart)\b/i.test(line.text)) {
       if (acc) {
-        out.push(acc.trim())
-        acc = ""
+        out.push({ ...acc, text: acc.text.trim() })
+        acc = null
       }
       out.push(line)
       continue
     }
-    acc = acc ? `${acc}\n${line}` : line
-    if (braceDepth(acc) <= 0) {
-      out.push(acc.trim())
-      acc = ""
+    if (acc) {
+      acc.text = `${acc.text}\n${line.text}`
+    } else {
+      acc = { ...line }
+    }
+    if (braceDepth(acc.text) <= 0) {
+      out.push({ ...acc, text: acc.text.trim() })
+      acc = null
     }
   }
-  if (acc.length) out.push(acc.trim())
+  if (acc) out.push({ ...acc, text: acc.text.trim() })
   return out
 }
 
@@ -303,71 +351,209 @@ function parseEndpoint(raw: string): Endpoint {
   return { id }
 }
 
+export type GraphDirection = "TD" | "TB" | "LR" | "RL" | "BT"
+
+const GRAPH_HEADER_RE = /^(?:graph|flowchart)\s+(TD|TB|LR|RL|BT)\s*$/i
+
 export interface ParsedGraph {
   nodes: NodeData[]
   edges: EdgeData[]
   caption?: string
+  /** Direction from `graph TD|LR|…` (default `TD`). */
+  direction?: GraphDirection
   /** Document-level config from leading YAML `---` frontmatter. */
   frontmatter?: OsseFrontmatter
+  /** First/only error formatted as `Line N[:C]: message` (joined by newline when several). */
   error?: string
+  /**
+   * Every parse issue found in one pass: line-level syntax errors, and undeclared-id
+   * warnings (non-strict) or errors (strict). Present whenever non-empty; see strict mode below.
+   */
+  diagnostics?: ParseDiagnostic[]
 }
 
-const CAPTION_RE = /^%%\s*caption:?\s*(.+)$/i
+export interface SerializeMermaidOptions {
+  caption?: string
+  direction?: GraphDirection
+}
 
-/**
- * Parser for the project’s Mermaid subset. Canonical spec: `docs/mermaid-patterns.md`.
- *
- * Optional YAML frontmatter (`---` … `---`) sets theme, animation, pulse, and fit (§7A).
- * Nested `registry.children` trees are not expressible in this syntax; use JSON `NodeData[]`.
- * Mermaid-compatible links: `-->`, `---`, `-.->`, `==>`, `-- text -->`, `-. text .->`, `-->|text|`.
- * Multiline labels: `<br/>` inside brackets or quotes.
- */
-export function parseMermaid(src: string): ParsedGraph {
-  const nodeMap = new Map<string, NodeData>()
-  const edges: EdgeData[] = []
-  let caption: string | undefined
-  try {
-    const extracted = extractFrontmatter(src)
-    if (extracted.error) {
-      return { nodes: [], edges: [], error: extracted.error, frontmatter: extracted.frontmatter }
+interface ScopeTree {
+  header: SourceLine | null
+  lines: SourceLine[]
+  children: ScopeTree[]
+}
+
+interface BareRefLocation {
+  line: number
+  column: number
+  childrenTarget: NodeData[] | null
+}
+
+interface ParseContext {
+  nodeMap: Map<string, NodeData>
+  edges: EdgeData[]
+  diagnostics: ParseDiagnostic[]
+  strict: boolean
+  bareRefs: Map<string, BareRefLocation>
+  /** When set, node declarations and auto-created nodes land in this children array. */
+  childrenTarget: NodeData[] | null
+}
+
+function parseGraphDirection(line: string): GraphDirection | null {
+  const m = GRAPH_HEADER_RE.exec(line.trim())
+  if (!m) return null
+  return m[1].toUpperCase() as GraphDirection
+}
+
+function mergeNodeData(existing: NodeData, incoming: NodeData): NodeData {
+  return {
+    ...existing,
+    ...incoming,
+    children: incoming.children?.length ? incoming.children : existing.children,
+    slots: incoming.slots?.length ? incoming.slots : existing.slots,
+    bodyLines: incoming.bodyLines?.length ? incoming.bodyLines : existing.bodyLines,
+  }
+}
+
+function findNodeInChildren(id: string, children?: NodeData[]): NodeData | undefined {
+  if (!children?.length) return undefined
+  for (const child of children) {
+    if (child.id === id) return child
+    const nested = findNodeInChildren(id, child.children)
+    if (nested) return nested
+  }
+  return undefined
+}
+
+function findNodeById(id: string, nodeMap: Map<string, NodeData>): NodeData | undefined {
+  if (nodeMap.has(id)) return nodeMap.get(id)
+  for (const node of nodeMap.values()) {
+    const nested = findNodeInChildren(id, node.children)
+    if (nested) return nested
+  }
+  return undefined
+}
+
+function upsertNode(node: NodeData, ctx: ParseContext): void {
+  const target = ctx.childrenTarget
+  if (target) {
+    const idx = target.findIndex((c) => c.id === node.id)
+    if (idx >= 0) target[idx] = mergeNodeData(target[idx], node)
+    else target.push(node)
+    return
+  }
+  if (ctx.nodeMap.has(node.id)) {
+    ctx.nodeMap.set(node.id, mergeNodeData(ctx.nodeMap.get(node.id)!, node))
+  } else {
+    ctx.nodeMap.set(node.id, node)
+  }
+}
+
+function recordBareRef(id: string, source: SourceLine, ctx: ParseContext): void {
+  if (ctx.bareRefs.has(id)) return
+  const idx = new RegExp(`\\b${escapeRegExp(id)}\\b`).exec(source.text)?.index
+  ctx.bareRefs.set(id, {
+    line: source.line,
+    column: idx != null ? source.column + idx : source.column,
+    childrenTarget: ctx.childrenTarget,
+  })
+}
+
+function parseSubgraphHeader(text: string): { id: string; node: NodeData } {
+  const s = text.trim()
+  const m = /^subgraph\s+([\w-]+)(?:\[([^\]]*)\])?\s*$/i.exec(s)
+  if (!m) throw new Error(`Cannot parse subgraph header "${s}"`)
+  const id = m[1]
+  if (m[2] !== undefined) {
+    return { id, node: { ...parseRegistryBracket(m[2]), id, type: "registry" } }
+  }
+  return { id, node: { id, title: id, type: "registry" } }
+}
+
+function buildScopeTree(lines: SourceLine[], diagnostics: ParseDiagnostic[]): ScopeTree {
+  const root: ScopeTree = { header: null, lines: [], children: [] }
+  const stack: ScopeTree[] = [root]
+
+  for (const line of lines) {
+    if (/^(?:graph|flowchart)\b/i.test(line.text)) continue
+
+    if (/^subgraph\b/i.test(line.text)) {
+      const scope: ScopeTree = { header: line, lines: [], children: [] }
+      stack[stack.length - 1].children.push(scope)
+      stack.push(scope)
+      continue
     }
-    const frontmatter = extracted.frontmatter
 
-    const rawLines = extracted.body
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith("//"))
-
-    for (const line of rawLines) {
-      const cap = CAPTION_RE.exec(line)
-      if (cap) {
-        caption = cap[1].trim()
-        continue
+    if (/^end\b/i.test(line.text)) {
+      if (stack.length <= 1) {
+        diagnostics.push({
+          message: "Unexpected `end` without matching `subgraph`",
+          line: line.line,
+          column: line.column,
+          severity: "error",
+        })
+      } else {
+        stack.pop()
       }
+      continue
     }
 
-    const lines = mergeLinesWithOpenBraces(
-      rawLines.filter((l) => !CAPTION_RE.test(l) && !l.startsWith("%%"))
-    )
+    stack[stack.length - 1].lines.push(line)
+  }
 
-    const expandedLines: string[] = []
-    for (const line of lines) {
-      if (/^(graph|flowchart)\b/i.test(line)) {
-        expandedLines.push(line)
-        continue
-      }
-      expandedLines.push(...expandChainedEdges(line))
+  if (stack.length > 1) {
+    const open = stack[stack.length - 1]
+    diagnostics.push({
+      message: "Unclosed `subgraph` block (missing `end`)",
+      line: open.header?.line ?? 1,
+      column: open.header?.column,
+      severity: "error",
+    })
+  }
+
+  return root
+}
+
+function upsertSubgraphRegistry(registry: NodeData, ctx: ParseContext): NodeData[] {
+  const withChildren: NodeData = { ...registry, children: registry.children ?? [] }
+  if (ctx.childrenTarget) {
+    const idx = ctx.childrenTarget.findIndex((c) => c.id === withChildren.id)
+    if (idx >= 0) {
+      ctx.childrenTarget[idx] = mergeNodeData(ctx.childrenTarget[idx], withChildren)
+      const children = ctx.childrenTarget[idx].children ?? (ctx.childrenTarget[idx].children = [])
+      return children
     }
+    ctx.childrenTarget.push(withChildren)
+    return withChildren.children!
+  }
+  if (ctx.nodeMap.has(withChildren.id)) {
+    const existing = ctx.nodeMap.get(withChildren.id)!
+    const merged = mergeNodeData(existing, withChildren)
+    ctx.nodeMap.set(withChildren.id, merged)
+    return merged.children ?? (merged.children = [])
+  }
+  ctx.nodeMap.set(withChildren.id, withChildren)
+  return withChildren.children!
+}
 
-    for (const line of expandedLines) {
-      if (/^(graph|flowchart)\b/i.test(line)) continue
+function processScopeLines(lines: SourceLine[], ctx: ParseContext): void {
+  const expandedLines: SourceLine[] = []
+  for (const line of lines) {
+    for (const text of expandChainedEdges(line.text)) {
+      expandedLines.push({ ...line, text })
+    }
+  }
 
-      const edge = parseEdgeLine(line)
+  for (const entry of expandedLines) {
+    try {
+      const edge = parseEdgeLine(entry.text)
       if (edge) {
         const { from: a, to: b, link, anchors } = edge
-        if (a.node && !nodeMap.has(a.id)) nodeMap.set(a.id, a.node)
-        if (b.node && !nodeMap.has(b.id)) nodeMap.set(b.id, b.node)
-        edges.push({
+        if (a.node) upsertNode(a.node, ctx)
+        else recordBareRef(a.id, entry, ctx)
+        if (b.node) upsertNode(b.node, ctx)
+        else recordBareRef(b.id, entry, ctx)
+        ctx.edges.push({
           from: a.id,
           to: b.id,
           linkStyle: link.linkStyle,
@@ -375,20 +561,171 @@ export function parseMermaid(src: string): ParsedGraph {
           ...anchors,
         })
       } else {
-        const ep = parseEndpoint(line)
-        if (ep.node && !nodeMap.has(ep.id)) nodeMap.set(ep.id, ep.node)
+        const ep = parseEndpoint(entry.text)
+        if (ep.node) upsertNode(ep.node, ctx)
+      }
+    } catch (err) {
+      ctx.diagnostics.push({
+        message: err instanceof Error ? err.message : String(err),
+        line: entry.line,
+        column: entry.column,
+        severity: "error",
+      })
+    }
+  }
+}
+
+function processScopeTree(scope: ScopeTree, ctx: ParseContext): void {
+  let scopeCtx = ctx
+
+  if (scope.header) {
+    try {
+      const { id, node } = parseSubgraphHeader(scope.header.text)
+      const children = upsertSubgraphRegistry(node, ctx)
+      scopeCtx = { ...ctx, childrenTarget: children }
+    } catch (err) {
+      ctx.diagnostics.push({
+        message: err instanceof Error ? err.message : String(err),
+        line: scope.header.line,
+        column: scope.header.column,
+        severity: "error",
+      })
+      return
+    }
+  }
+
+  processScopeLines(scope.lines, scopeCtx)
+  for (const child of scope.children) {
+    processScopeTree(child, scopeCtx)
+  }
+}
+
+function resolveBareRefs(ctx: ParseContext): void {
+  for (const [id, loc] of ctx.bareRefs) {
+    if (findNodeById(id, ctx.nodeMap)) continue
+    if (ctx.strict) {
+      ctx.diagnostics.push({
+        message: `Undeclared node id "${id}" is used in an edge but never declared with a shape (strict mode)`,
+        line: loc.line,
+        column: loc.column,
+        severity: "error",
+      })
+    } else {
+      ctx.diagnostics.push({
+        message: `Undeclared node id "${id}" auto-created as a registry — declare it explicitly (e.g. "${id}[${id}]") if this isn't a typo`,
+        line: loc.line,
+        column: loc.column,
+        severity: "warning",
+      })
+      const auto: NodeData = { id, title: id, type: "registry" }
+      if (loc.childrenTarget) {
+        const idx = loc.childrenTarget.findIndex((c) => c.id === id)
+        if (idx >= 0) loc.childrenTarget[idx] = mergeNodeData(loc.childrenTarget[idx], auto)
+        else loc.childrenTarget.push(auto)
+      } else {
+        ctx.nodeMap.set(id, auto)
       }
     }
-    // Fill in any referenced-but-undeclared nodes as registry with id as title
-    for (const e of edges) {
-      if (!nodeMap.has(e.from)) nodeMap.set(e.from, { id: e.from, title: e.from, type: "registry" })
-      if (!nodeMap.has(e.to)) nodeMap.set(e.to, { id: e.to, title: e.to, type: "registry" })
+  }
+}
+
+const CAPTION_RE = /^%%\s*caption:?\s*(.+)$/i
+
+/**
+ * Parser for the project’s Mermaid subset. Canonical spec: `docs/mermaid-patterns.md`.
+ *
+ * Optional YAML frontmatter (`---` … `---`) sets theme, animation, pulse, fit, and strict (§7A).
+ * Directions: `graph TD|TB|LR|RL|BT`. Nested registries via `subgraph` / `end` → `registry.children`.
+ * Mermaid-compatible links: `-->`, `---`, `-.->`, `==>`, `-- text -->`, `-. text .->`, `-->|text|`.
+ * Multiline labels: `<br/>` inside brackets or quotes.
+ *
+ * **Diagnostics & strict mode** — every parse issue is collected in one pass onto
+ * `ParsedGraph.diagnostics` (line + column when practical). Node ids referenced by an edge
+ * but never declared with a shape (`id[…]` / `id(…)` / `id{…}`) are the classic typo trap:
+ * by default they're silently auto-created as a registry node (warning diagnostic); pass
+ * `{ strict: true }` (or set frontmatter `strict: true`) to make that a hard parse error
+ * instead — `nodes`/`edges` come back empty and `error` is set, same as a syntax error.
+ */
+export function parseMermaid(src: string, options?: ParseMermaidOptions): ParsedGraph {
+  const diagnostics: ParseDiagnostic[] = []
+  let caption: string | undefined
+  try {
+    const extracted = extractFrontmatter(src)
+    if (extracted.error) {
+      const d: ParseDiagnostic = { message: extracted.error, line: extracted.line ?? 1, severity: "error" }
+      return {
+        nodes: [],
+        edges: [],
+        error: formatDiagnostics([d]),
+        diagnostics: [d],
+        ...(extracted.frontmatter ? { frontmatter: extracted.frontmatter } : {}),
+      }
     }
+    const frontmatter = extracted.frontmatter
+    const strict = options?.strict ?? frontmatter?.strict ?? false
+
+    const frontmatterLineCount = src.slice(0, src.length - extracted.body.length).split("\n").length - 1
+
+    const rawLines: SourceLine[] = []
+    extracted.body.split("\n").forEach((raw, idx) => {
+      const text = raw.trim()
+      if (!text || text.startsWith("//")) return
+      rawLines.push({
+        text,
+        line: frontmatterLineCount + idx + 1,
+        column: raw.length - raw.trimStart().length + 1,
+      })
+    })
+
+    for (const l of rawLines) {
+      const cap = CAPTION_RE.exec(l.text)
+      if (cap) caption = cap[1].trim()
+    }
+
+    const contentLines = rawLines.filter((l) => !CAPTION_RE.test(l.text) && !l.text.startsWith("%%"))
+    const mergedLines = mergeLinesWithOpenBraces(contentLines)
+
+    let direction: GraphDirection = "TD"
+    for (const l of mergedLines) {
+      const parsedDir = parseGraphDirection(l.text)
+      if (parsedDir) {
+        direction = parsedDir
+        break
+      }
+    }
+
+    const scopeTree = buildScopeTree(mergedLines, diagnostics)
+    const ctx: ParseContext = {
+      nodeMap: new Map<string, NodeData>(),
+      edges: [],
+      diagnostics,
+      strict,
+      bareRefs: new Map<string, BareRefLocation>(),
+      childrenTarget: null,
+    }
+
+    processScopeTree(scopeTree, ctx)
+    resolveBareRefs(ctx)
+
+    const errors = ctx.diagnostics.filter((d) => d.severity === "error")
+    if (errors.length > 0) {
+      return {
+        nodes: [],
+        edges: [],
+        error: formatDiagnostics(errors),
+        diagnostics: ctx.diagnostics,
+        direction,
+        ...(frontmatter ? { frontmatter } : {}),
+      }
+    }
+
     return {
-      nodes: Array.from(nodeMap.values()),
-      edges,
+      nodes: Array.from(ctx.nodeMap.values()),
+      edges: ctx.edges,
       caption,
+      direction,
       ...(frontmatter ? { frontmatter } : {}),
+      ...(ctx.diagnostics.length ? { diagnostics: ctx.diagnostics } : {}),
     }
   } catch (err) {
     return {
@@ -423,38 +760,82 @@ function serializeLink(e: EdgeData): string {
   return "-->"
 }
 
+function formatNodeDecl(n: NodeData): string {
+  const [open, close] = nodeBrackets(n)
+  const singleSuffix = n.type === "registry" && n.registryFrame === "single" ? " # frame=single" : ""
+  if (n.type === "registry" && n.slots?.length) {
+    return `${n.id}${open}${[n.title, ...n.slots].join("|")}${singleSuffix}${close}`
+  }
+  if (n.type === "registry") {
+    const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
+    return `${n.id}${open}${body}${singleSuffix}${close}`
+  }
+  if (n.type === "resolver") {
+    const stack = n.stackDepth != null && n.stackDepth >= 2 ? ` # stack=${n.stackDepth}` : ""
+    const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
+    return `${n.id}${open}${body}${stack}${close}`
+  }
+  const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
+  return `${n.id}${open}${body}${close}`
+}
+
+function serializeSubgraphHeader(registry: NodeData): string {
+  const id = registry.id
+  const singleSuffix = registry.registryFrame === "single" ? " # frame=single" : ""
+  if (registry.slots?.length) {
+    return `subgraph ${id}[${[registry.title, ...registry.slots].join("|")}${singleSuffix}]`
+  }
+  if (registry.bodyLines?.length) {
+    return `subgraph ${id}[${formatNodeLabel(registry)}${singleSuffix}]`
+  }
+  return `subgraph ${id}[${registry.title}${singleSuffix}]`
+}
+
+function serializeSubgraph(registry: NodeData, indent: string): string[] {
+  const lines: string[] = []
+  lines.push(`${indent}${serializeSubgraphHeader(registry)}`)
+  const childIndent = `${indent}  `
+  for (const child of registry.children ?? []) {
+    if (child.type === "registry" && child.children?.length) {
+      lines.push(...serializeSubgraph(child, childIndent))
+    } else {
+      lines.push(`${childIndent}${formatNodeDecl(child)}`)
+    }
+  }
+  lines.push(`${indent}end`)
+  return lines
+}
+
 export function serializeMermaid(
   nodes: NodeData[],
   edges: EdgeData[],
-  caption?: string
+  captionOrOptions?: string | SerializeMermaidOptions
 ): string {
+  const options: SerializeMermaidOptions =
+    typeof captionOrOptions === "string" ? { caption: captionOrOptions } : (captionOrOptions ?? {})
   const nodeMap = new Map(nodes.map((n) => [n.id, n]))
   const declared = new Set<string>()
+  const subgraphIds = new Set(
+    nodes.filter((n) => n.type === "registry" && n.children?.length).map((n) => n.id)
+  )
   const out: string[] = []
-  if (caption?.trim()) out.push(`%% caption: ${caption.trim()}`)
-  out.push("graph TD")
+  if (options.caption?.trim()) out.push(`%% caption: ${options.caption.trim()}`)
+  out.push(`graph ${options.direction ?? "TD"}`)
+
+  for (const n of nodes) {
+    if (n.type === "registry" && n.children?.length) {
+      out.push(...serializeSubgraph(n, "  "))
+      declared.add(n.id)
+    }
+  }
+
   const decl = (id: string) => {
     if (declared.has(id)) return id
     declared.add(id)
     const n = nodeMap.get(id)
     if (!n) return id
-    const [open, close] = nodeBrackets(n)
-    const singleSuffix = n.type === "registry" && n.registryFrame === "single" ? " # frame=single" : ""
-    if (n.type === "registry" && n.slots?.length) {
-      return `${id}${open}${[n.title, ...n.slots].join("|")}${singleSuffix}${close}`
-    }
-    if (n.type === "registry") {
-      const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
-      return `${id}${open}${body}${singleSuffix}${close}`
-    }
-    if (n.type === "resolver") {
-      const stack =
-        n.stackDepth != null && n.stackDepth >= 2 ? ` # stack=${n.stackDepth}` : ""
-      const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
-      return `${id}${open}${body}${stack}${close}`
-    }
-    const body = n.bodyLines?.length ? formatNodeLabel(n) : n.title
-    return `${id}${open}${body}${close}`
+    if (subgraphIds.has(id)) return id
+    return formatNodeDecl(n)
   }
   const edgeAnchorSuffix = (e: EdgeData): string => {
     const bits: string[] = []
@@ -467,10 +848,10 @@ export function serializeMermaid(
   for (const e of edges) {
     out.push(`  ${decl(e.from)} ${serializeLink(e)} ${decl(e.to)}${edgeAnchorSuffix(e)}`)
   }
-  // Any nodes that aren't on an edge
   for (const n of nodes) {
     if (!declared.has(n.id)) {
-      out.push(`  ${decl(n.id)}`)
+      out.push(`  ${formatNodeDecl(n)}`)
+      declared.add(n.id)
     }
   }
   return out.join("\n")

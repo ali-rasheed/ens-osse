@@ -1,8 +1,8 @@
 /**
  * Figma-style nested registry column used only when the editor matches the `nested-column`
  * preset (`findTemplateIdForSource` → ENS v2 registry column template).
- * Mermaid still cannot encode runtime `children`; the template now includes a comment hierarchy, while
- * this module provides the authoritative NodeData JSON merged onto `registry-root`.
+ * Mermaid `subgraph` blocks now encode `children`; this module is a legacy fallback when the
+ * parsed graph has no `children` on `registry-root`.
  */
 import type { NodeData } from "@ensdomains/osse"
 import { findTemplateIdForSource } from "./mermaidTemplates"

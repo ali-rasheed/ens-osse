@@ -60,6 +60,87 @@ describe("serializeMermaid round-trip", () => {
   })
 })
 
+describe("graph directions", () => {
+  it.each(["TD", "TB", "LR", "RL", "BT"] as const)("parses graph %s", (dir) => {
+    const { direction, error } = parseMermaid(`graph ${dir}\n  a[A] --> b[B]`)
+    expect(error).toBeUndefined()
+    expect(direction).toBe(dir)
+  })
+
+  it("round-trips direction through serializeMermaid", () => {
+    const src = `graph LR
+  a[A] --> b[B]`
+    const parsed = parseMermaid(src)
+    const out = serializeMermaid(parsed.nodes, parsed.edges, { direction: parsed.direction })
+    expect(out.startsWith("graph LR")).toBe(true)
+    const again = parseMermaid(out)
+    expect(again.direction).toBe("LR")
+    expect(again.error).toBeUndefined()
+  })
+})
+
+describe("subgraph / nested registries", () => {
+  const nestedSrc = `graph TD
+  subgraph registry-root[Registry]
+    nest-root[<root> # frame=single | owner: 0x0123...]
+    subgraph nest-wallet[wallet.workemon.eth # frame=single]
+      w-owner(owner: 0x0123...)
+      w-res{resolver: 0x6789...}
+    end
+  end
+  registry-root --> resolvers{Resolvers # stack=3}`
+
+  it("maps subgraph blocks to registry children", () => {
+    const { nodes, edges, error } = parseMermaid(nestedSrc)
+    expect(error).toBeUndefined()
+    const root = nodes.find((n) => n.id === "registry-root")
+    expect(root?.children).toHaveLength(2)
+    expect(root?.children?.[0]).toMatchObject({ id: "nest-root", type: "registry", registryFrame: "single" })
+    const wallet = root?.children?.find((c) => c.id === "nest-wallet")
+    expect(wallet?.children).toHaveLength(2)
+    expect(wallet?.children?.map((c) => c.id)).toEqual(["w-owner", "w-res"])
+    expect(edges).toHaveLength(1)
+    expect(edges[0]).toMatchObject({ from: "registry-root", to: "resolvers" })
+  })
+
+  it("round-trips subgraph children and direction", () => {
+    const parsed = parseMermaid(nestedSrc)
+    const out = serializeMermaid(parsed.nodes, parsed.edges, { direction: parsed.direction })
+    expect(out).toContain("subgraph registry-root[Registry]")
+    expect(out).toContain("subgraph nest-wallet[wallet.workemon.eth # frame=single]")
+    expect(out).toContain("w-owner(owner: 0x0123...)")
+    const again = parseMermaid(out)
+    expect(again.error).toBeUndefined()
+    expect(again.direction).toBe("TD")
+    const root = again.nodes.find((n) => n.id === "registry-root")
+    expect(root?.children?.find((c) => c.id === "nest-wallet")?.children).toHaveLength(2)
+  })
+
+  it("auto-creates undeclared ids inside subgraph children", () => {
+    const { nodes, diagnostics, error } = parseMermaid(`graph TD
+  subgraph group[Group]
+    a[A] --> ghost
+  end`)
+    expect(error).toBeUndefined()
+    const group = nodes.find((n) => n.id === "group")
+    expect(group?.children?.find((c) => c.id === "ghost")).toMatchObject({ type: "registry" })
+    expect(diagnostics?.[0]?.severity).toBe("warning")
+  })
+
+  it("errors on unexpected end", () => {
+    const { error } = parseMermaid(`graph TD
+  end`)
+    expect(error).toMatch(/Unexpected `end`/)
+  })
+
+  it("errors on unclosed subgraph", () => {
+    const { error } = parseMermaid(`graph TD
+  subgraph open[Open]
+    a[A]`)
+    expect(error).toMatch(/Unclosed `subgraph`/)
+  })
+})
+
 describe("chained edges", () => {
   it("expands A --> B & C into two edges", () => {
     const { edges } = parseMermaid(`graph TD
@@ -117,5 +198,110 @@ graph TD
     expect(error).toBeUndefined()
     expect(frontmatter?.animation?.preset).toBe("fade")
     expect(frontmatter?.animation?.stagger).toBe(0.2)
+  })
+
+  it("reports frontmatter errors with a line number", () => {
+    const { error, diagnostics } = parseMermaid(`---
+theme: neon
+---
+graph TD
+  a[A]
+`)
+    expect(error).toMatch(/^Line 2: /)
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics?.[0]).toMatchObject({ line: 2, severity: "error" })
+  })
+
+  it("parses strict: true", () => {
+    const { frontmatter, error } = parseMermaid(`---
+strict: true
+---
+graph TD
+  a[A] --> b[B]
+`)
+    expect(error).toBeUndefined()
+    expect(frontmatter?.strict).toBe(true)
+  })
+})
+
+describe("strict mode & undeclared-id diagnostics", () => {
+  it("auto-creates undeclared edge targets and warns (non-strict default)", () => {
+    const { nodes, edges, error, diagnostics } = parseMermaid(`graph TD
+  a[Registry A] --> b`)
+    expect(error).toBeUndefined()
+    expect(edges).toHaveLength(1)
+    const b = nodes.find((n) => n.id === "b")
+    expect(b).toMatchObject({ id: "b", title: "b", type: "registry" })
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics?.[0]).toMatchObject({ severity: "warning", line: 2 })
+    expect(diagnostics?.[0].message).toMatch(/Undeclared node id "b"/)
+  })
+
+  it("hard-fails on undeclared edge targets in strict mode", () => {
+    const { nodes, edges, error, diagnostics } = parseMermaid(
+      `graph TD
+  a[Registry A] --> b`,
+      { strict: true }
+    )
+    expect(nodes).toHaveLength(0)
+    expect(edges).toHaveLength(0)
+    expect(error).toMatch(/Line 2/)
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics?.[0]).toMatchObject({ severity: "error", line: 2 })
+    expect(diagnostics?.[0].message).toMatch(/Undeclared node id "b"/)
+  })
+
+  it("does not warn when the id is declared elsewhere in the source", () => {
+    const { error, diagnostics } = parseMermaid(
+      `graph TD
+  a[Registry A] --> b
+  b[Registry B]`,
+      { strict: true }
+    )
+    expect(error).toBeUndefined()
+    expect(diagnostics).toBeUndefined()
+  })
+
+  it("frontmatter strict: true is honored without an explicit option", () => {
+    const { error } = parseMermaid(`---
+strict: true
+---
+graph TD
+  a[A] --> typo`)
+    expect(error).toMatch(/Undeclared node id "typo"/)
+  })
+
+  it("an explicit strict option overrides frontmatter strict", () => {
+    const { error } = parseMermaid(
+      `---
+strict: true
+---
+graph TD
+  a[A] --> typo`,
+      { strict: false }
+    )
+    expect(error).toBeUndefined()
+  })
+})
+
+describe("line-level syntax diagnostics", () => {
+  it("reports the failing line number for an unparseable node", () => {
+    const { nodes, edges, error, diagnostics } = parseMermaid(`graph TD
+  a[A]
+  b[[Bad Shape]]`)
+    expect(nodes).toHaveLength(0)
+    expect(edges).toHaveLength(0)
+    expect(error).toMatch(/^Line 3:\d+: /)
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics?.[0].severity).toBe("error")
+    expect(diagnostics?.[0].line).toBe(3)
+  })
+
+  it("collects multiple line-level errors in one pass", () => {
+    const { diagnostics } = parseMermaid(`graph TD
+  a[[Bad One]]
+  b[[Bad Two]]`)
+    expect(diagnostics).toHaveLength(2)
+    expect(diagnostics?.map((d) => d.line)).toEqual([2, 3])
   })
 })

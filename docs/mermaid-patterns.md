@@ -2,7 +2,7 @@
 
 **Source of truth** for the diagram editor’s Mermaid-like syntax. The parser lives in [`packages/osse/src/mermaid.ts`](../packages/osse/src/mermaid.ts). Preset graphs live in [`src/lib/mermaidTemplates.ts`](../src/lib/mermaidTemplates.ts). Naming: [`docs/naming.md`](./naming.md).
 
-This is **not** full Mermaid: only the patterns below are supported. Lines are trimmed; `//` and `%%` comments are ignored. The first line may be `graph TD` or `flowchart TD` (case-insensitive).
+This is **not** full Mermaid: only the patterns below are supported. Lines are trimmed; `//` and `%%` comments are ignored. The first line may be `graph TD` / `flowchart TD` (or `TB`, `LR`, `RL`, `BT`; case-insensitive).
 
 ---
 
@@ -28,6 +28,7 @@ graph TD
 | `stagger` | number (seconds) | Merged into `animation.stagger` |
 | `pulse` | `{ from, to, stagger?, segmentDuration?, hold? }` | Path pulse between node ids |
 | `fit` | `none` \| `width` \| `clamp` | Hint for responsive hosts |
+| `strict` | `true` \| `false` | Hard-fail on undeclared edge ids instead of warning — see [Strict mode & diagnostics](#strict-mode--diagnostics) |
 
 Consumed by `parseMermaid` → `ParsedGraph.frontmatter` and by `<OsseDiagram source={…} />`.
 
@@ -37,13 +38,15 @@ Docs authors can fence the same source as ` ```osse ` (remark plugin `@ensdomain
 
 ## Graph declaration
 
-Optional first line:
+Optional first line declares graph type and **direction**:
 
 ```text
 graph TD
 ```
 
-or `flowchart TD`. Other graph types and directions are not implemented.
+or `flowchart TD`. Supported directions: **`TD`**, **`TB`** (top-down, equivalent), **`LR`** (left-right), **`RL`** (right-left), **`BT`** (bottom-top). Parsed into `ParsedGraph.direction` and round-tripped by `serializeMermaid`.
+
+**Layout note:** Dagre receives the parsed direction, but hierarchy/alias routers are tuned for top-down (`TD`/`TB`). `LR` / `RL` / `BT` sources parse and serialize correctly; edge routing for those directions is best-effort until a later layout pass.
 
 ---
 
@@ -89,7 +92,38 @@ stacked{Resolvers # stack=3}
 
 ## Referenced-but-undeclared nodes
 
-If an edge mentions an id that never appears on its own line or as an inline node, the parser **creates** that node as a **registry** whose label is the same as its id. This keeps small graphs terse but can **hide typos**; if something looks wrong, declare nodes explicitly.
+If an edge mentions an id that never appears on its own line or as an inline node, the parser **creates** that node as a **registry** whose label is the same as its id. This keeps small graphs terse but can **hide typos**; if something looks wrong, declare nodes explicitly, or turn on [strict mode](#strict-mode--diagnostics) so it's a parse error instead.
+
+---
+
+## Strict mode & diagnostics
+
+`parseMermaid` returns `ParsedGraph.diagnostics`: every parse issue found in **one pass**, each with `{ message, line, column?, severity }` (`line`/`column` are 1-based, `line` counts frontmatter lines too). `ParsedGraph.error` stays a plain string for existing callers — `Line N[:C]: message`, joined by newline when there are several — and is only set when at least one diagnostic is `"error"` severity, in which case `nodes`/`edges` come back **empty** (same contract as any other parse failure).
+
+Two families of diagnostic:
+
+| Diagnostic | Default (non-strict) | Strict mode |
+|------------|----------------------|--------------|
+| Line-level syntax error (unparseable node/edge) | `error` — always fails the parse | same |
+| [Referenced-but-undeclared](#referenced-but-undeclared-nodes) edge id | `warning` — node is auto-created, graph still renders | `error` — fails the parse, closing the typo trap |
+
+**Enabling strict mode** — either works, and an explicit option always wins over frontmatter:
+
+```text
+---
+strict: true
+---
+graph TD
+  a[Registry A] --> b
+```
+
+```ts
+import { parseMermaid } from "@ensdomains/osse/mermaid"
+
+const { error, diagnostics } = parseMermaid(source, { strict: true })
+```
+
+`<OsseDiagram source={…} strict />` passes the option through. The demo app's **Strict mode** checkbox (Mermaid editor panel) does the same and lists every diagnostic under the textarea.
 
 ---
 
@@ -156,7 +190,7 @@ Dagre assigns node ranks and rough edge paths; ENS post-processes polylines befo
 | Relationship | Tail | Head |
 |--------------|------|------|
 | Parent → child (hierarchy router) | Source bottom-center | Target top-center |
-| Same-rank or sibling alias | Source bottom-center | Target top-center (lane below nodes) |
+| Same-rank or sibling alias | Source bottom-center | Target bottom-center (lane below nodes; avoids cutting through the target or the hierarchy fan-out) |
 | Cross-rank alias | Source bottom-center | Target side-center (dedicated lane) |
 | Slot delegation | Slot bottom-center | Per target semantics |
 
@@ -170,6 +204,22 @@ Hierarchy paths use **vertical-first (`vhv`)** fan-out: drop from the parent, jo
 | `route=hv` | Hierarchy + default orthogonal pass | Horizontal-first elbow |
 | `route=vhv` | Hierarchy + default orthogonal pass | Vertical → horizontal → vertical |
 | `route=*` on alias edges | **Ignored** | Alias router always wins |
+
+### Octilinear routing (H / V / 45°)
+
+Edge polylines follow an **octilinear vocabulary** (layout invariant 2): every segment is
+horizontal, vertical, or exactly 45°. Rules enforced by `validateOctilinear(points)` in
+[`layout.ts`](../packages/osse/src/RegistryDiagram/layout.ts):
+
+- Each 45° leg must join an axis-aligned (H/V) leg at **both** ends — no off-grid diagonals, and no two 45° legs back-to-back.
+- The **first and last** legs (port approach) are always axis-aligned, so arrowheads meet the node frame on-axis.
+
+By default routers emit pure orthogonal (H/V) paths. The `chamfer` layout option (or, later, the
+`# route=chamfer` edge token) softens the hierarchy/alias routers' 90° bends into 45° legs via
+`insertChamfer45(points, chamfer)`: it retreats an equal distance along each leg of a bend so the
+connecting leg is exactly 45°, clamped to half of each adjoining leg and preserving the ports.
+`pointsToPath` serializes the resulting diagonal legs as straight `L` runs (bends still filleted by
+`cornerRadius`).
 
 ### Spacing knobs (UI)
 
@@ -215,11 +265,36 @@ Link stroke patterns, delegation marker, and edge label chip sizing: [`src/compo
 
 ---
 
-## Nested registries
+## Nested registries (`subgraph` / `end`)
 
-Trees where a **registry contains child nodes inside one frame** (e.g. Figma nested column) are **not** expressible in this syntax. Define them in application data as `NodeData.children` on a `type: "registry"` node (see [`src/components/RegistryDiagram/types.ts`](../src/components/RegistryDiagram/types.ts)).
+A **`subgraph` … `end`** block maps to a **registry** node whose inner declarations become `NodeData.children` (vertical stack inside one frame — Figma nested column). Nested `subgraph` blocks become nested registry `children`.
 
-The demo app’s **Template → ENS v2 registry column** loads minimal Mermaid (`registry-root[Registry] --> resolvers{Resolvers # stack=3}`). Because Mermaid cannot carry `children`, the app **merges** bundled JSON from [`src/lib/nestedColumnDemoData.ts`](../src/lib/nestedColumnDemoData.ts) onto `registry-root` when that preset matches the editor source (`flowchart TD` on line one is treated like `graph TD` for matching). Other presets and custom sources do **not** get this merge. MDX embed payloads are still Mermaid-only — consumers who need the same nested column must replicate that merge or ship `NodeData` JSON.
+```text
+graph TD
+  subgraph registry-root[Registry]
+    nest-root[<root> # frame=single | owner: 0x0123...]
+    nest-eth[eth # frame=single | owner: 0x0123...]
+    subgraph nest-wallet[wallet.workemon.eth # frame=single]
+      w-owner(owner: 0x0123...)
+      w-res{resolver: 0x6789...}
+    end
+  end
+  registry-root --> resolvers{Resolvers # stack=3}
+```
+
+| Syntax | Maps to |
+|--------|---------|
+| `subgraph id` | Registry `id` with `title: id` |
+| `subgraph id[label]` | Registry with bracket body (slots, `# frame=single`, `<br/>` body lines — same rules as `id[label]`) |
+| Lines inside the block | Child nodes (`registry`, `pill`, `resolver` shapes) in source order |
+| Nested `subgraph` | Child registry with its own `children` |
+| `end` | Closes the current block (case-insensitive) |
+
+Edges may reference subgraph ids or child ids (`registry-root --> resolvers`, or `w-owner --> w-res` inside a block). Undeclared ids inside a subgraph are auto-created in that block’s children (or hard-fail in strict mode).
+
+`serializeMermaid` emits `subgraph` / `end` for registries with `children` and preserves `direction`. JSON-only `children` (no subgraph in source) still round-trip when serialized.
+
+The demo **ENS v2 registry column** preset uses subgraph syntax; [`nestedColumnDemoData.ts`](../src/lib/nestedColumnDemoData.ts) merges only when the parsed graph has no `children` on `registry-root` (legacy comment-only sources).
 
 ---
 
@@ -238,7 +313,7 @@ Built-in presets (sidebar **Template** dropdown) are defined in `mermaidTemplate
 
 ## Serialize / round-trip
 
-[`serializeMermaid`](../src/lib/mermaid.ts) emits `graph TD`, optional `%% caption:`, multiline quoted registry labels with `<br/>`, Mermaid link tokens (`-. label .->` for dotted), and ENS edge metadata `# fromSlot=…` etc. Nested `children` are **not** written back to Mermaid.
+[`serializeMermaid`](../packages/osse/src/mermaid.ts) emits the parsed **`direction`** (default `graph TD`), optional `%% caption:`, `subgraph` / `end` blocks for registries with `children`, multiline quoted registry labels with `<br/>`, Mermaid link tokens (`-. label .->` for dotted), and ENS edge metadata `# fromSlot=…` etc. `parseMermaid` → `serializeMermaid` → `parseMermaid` preserves direction, nested children, nodes, and edges.
 
 ---
 

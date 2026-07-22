@@ -15,12 +15,19 @@ export interface OsseFrontmatter {
   /** Path pulse; `loop` is accepted in YAML and ignored (pulse always loops when set). */
   pulse?: PathPulseConfig
   fit?: FitMode
+  /**
+   * Error (not just warn) on node ids referenced by an edge but never declared with a shape —
+   * see `mermaid.ts` § strict mode. A `parseMermaid(src, { strict })` option always overrides this.
+   */
+  strict?: boolean
 }
 
 export interface FrontmatterParseResult {
   body: string
   frontmatter?: OsseFrontmatter
   error?: string
+  /** 1-based source line of `error`, when known. */
+  line?: number
 }
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
@@ -127,24 +134,33 @@ function pulseFromObj(obj: Record<string, string | number | boolean>): PathPulse
  * Parse a YAML-ish frontmatter block into `OsseFrontmatter`.
  * Supports flat `key: value` and single-line `{ nested: objects }`.
  */
-export function parseFrontmatterBlock(yaml: string): { config: OsseFrontmatter; error?: string } {
+export function parseFrontmatterBlock(
+  yaml: string
+): { config: OsseFrontmatter; error?: string; line?: number } {
   const config: OsseFrontmatter = {}
   const lines = yaml.split(/\r?\n/)
-  for (const line of lines) {
-    const trimmed = line.trim()
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim()
     if (!trimmed || trimmed.startsWith("#")) continue
     const colon = trimmed.indexOf(":")
     if (colon < 0) continue
     const key = trimmed.slice(0, colon).trim()
     const rest = trimmed.slice(colon + 1).trim()
+    /* Frontmatter occupies lines 1..N+1 in the full source: opening `---` is line 1, so
+     * yaml line `i` (0-based) is source line `i + 2`. */
+    const line = i + 2
     if (key === "theme") {
       const theme = normalizeTheme(asString(parseScalar(rest)) ?? "")
       if (theme) config.theme = theme
-      else return { config, error: `Unknown theme "${rest}" (use light|dark|protocol|docs)` }
+      else return { config, error: `Unknown theme "${rest}" (use light|dark|protocol|docs)`, line }
     } else if (key === "fit") {
       const fit = normalizeFit(asString(parseScalar(rest)) ?? "")
       if (fit) config.fit = fit
-      else return { config, error: `Unknown fit "${rest}" (use none|width|clamp)` }
+      else return { config, error: `Unknown fit "${rest}" (use none|width|clamp)`, line }
+    } else if (key === "strict") {
+      const v = parseScalar(rest)
+      if (typeof v === "boolean") config.strict = v
+      else return { config, error: `Unknown strict "${rest}" (use true|false)`, line }
     } else if (key === "animation") {
       if (rest.startsWith("{")) {
         config.animation = animationFromObj(parseInlineObject(rest))
@@ -158,7 +174,7 @@ export function parseFrontmatterBlock(yaml: string): { config: OsseFrontmatter; 
       if (rest.startsWith("{")) {
         const pulse = pulseFromObj(parseInlineObject(rest))
         if (pulse) config.pulse = pulse
-        else return { config, error: "pulse requires from and to" }
+        else return { config, error: "pulse requires from and to", line }
       }
     } else if (key === "stagger") {
       const n = asNumber(parseScalar(rest))
@@ -174,10 +190,10 @@ export function parseFrontmatterBlock(yaml: string): { config: OsseFrontmatter; 
 export function extractFrontmatter(src: string): FrontmatterParseResult {
   const m = FRONTMATTER_RE.exec(src)
   if (!m) return { body: src }
-  const { config, error } = parseFrontmatterBlock(m[1])
+  const { config, error, line } = parseFrontmatterBlock(m[1])
   return {
     body: src.slice(m[0].length),
     frontmatter: config,
-    ...(error ? { error } : {}),
+    ...(error ? { error, line } : {}),
   }
 }

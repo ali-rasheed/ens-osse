@@ -17,6 +17,7 @@ import type {
   PathPulseConfig,
 } from "./RegistryDiagram/types"
 import type { FitMode } from "./frontmatter"
+import type { GraphDirection } from "./mermaid"
 
 export interface OsseDiagramProps {
   /** Mermaid (+ optional YAML frontmatter). When set, overrides `nodes`/`edges`. */
@@ -30,6 +31,11 @@ export interface OsseDiagramProps {
   mode?: DiagramMode
   /** Fit hint for hosts (frontmatter `fit`); not applied by the canvas itself yet. */
   fit?: FitMode
+  /**
+   * Error (not warn) on undeclared node ids used in edges — the typo trap. Overrides
+   * frontmatter `strict:` when set. See `parseMermaid` in `./mermaid`.
+   */
+  strict?: boolean
   /** Called when parse fails; diagram renders empty. */
   onParseError?: (message: string) => void
 }
@@ -64,14 +70,15 @@ export const OsseDiagram = forwardRef<HTMLDivElement, OsseDiagramProps>(
       pathPulse: pathPulseProp,
       mode: modeProp,
       fit: _fit,
+      strict,
       onParseError,
     },
     ref
   ) {
     const parsed = useMemo(() => {
       if (source == null) return null
-      return parseMermaid(source)
-    }, [source])
+      return parseMermaid(source, { strict })
+    }, [source, strict])
 
     useEffect(() => {
       if (parsed?.error) onParseError?.(parsed.error)
@@ -106,6 +113,7 @@ export const OsseDiagram = forwardRef<HTMLDivElement, OsseDiagramProps>(
         edges={edges}
         animation={animation}
         config={config}
+        direction={parsed?.direction}
         pathPulse={pathPulse}
       />
     )
